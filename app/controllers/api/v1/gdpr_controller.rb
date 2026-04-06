@@ -27,22 +27,26 @@ module Api
 
       # Right to erasure — delete all client data
       def delete_data
-        @current_client.food_entries.destroy_all
-        @current_client.symptoms.destroy_all
-        @current_client.energy_logs.destroy_all
-        @current_client.sleep_logs.destroy_all
-        @current_client.water_intakes.destroy_all
-        @current_client.supplements.destroy_all
+        ApplicationRecord.transaction do
+          @current_client.food_entries.destroy_all
+          @current_client.symptoms.destroy_all
+          @current_client.energy_logs.destroy_all
+          @current_client.sleep_logs.destroy_all
+          @current_client.water_intakes.destroy_all
+          @current_client.supplements.destroy_all
 
-        # Record that deletion was requested (keep consent records for legal compliance)
-        @current_client.consents.create!(
-          consent_type: "data_deletion_request",
-          version: "1.0",
-          granted_at: Time.current,
-          ip_address: request.remote_ip
-        )
+          # Record that deletion was requested (keep consent records for legal compliance)
+          @current_client.consents.create!(
+            consent_type: "data_deletion_request",
+            version: "1.0",
+            granted_at: Time.current,
+            ip_address: request.remote_ip
+          )
+        end
 
         render json: { message: "All health data has been deleted", deleted_at: Time.current }
+      rescue ActiveRecord::RecordInvalid => e
+        render_validation_errors(e.record)
       end
     end
   end

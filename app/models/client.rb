@@ -38,6 +38,6 @@ class Client < ApplicationRecord
   end
 
   def password_required?
-    invite_accepted_at.present? || password_digest_changed?
+    password.present? || password_digest_changed?
   end
 end

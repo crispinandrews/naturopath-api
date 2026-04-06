@@ -13,7 +13,25 @@ Dir[Rails.root.join("spec/support/**/*.rb")].sort.each { |file| require file }
 
 RSpec.configure do |config|
   config.fixture_paths = [ Rails.root.join("spec/fixtures") ]
-  config.use_transactional_fixtures = true
+  config.use_transactional_fixtures = false
   config.infer_spec_type_from_file_location!
   config.filter_rails_from_backtrace!
+
+  config.before(:suite) do
+    tables = ActiveRecord::Base.connection.tables - %w[ schema_migrations ar_internal_metadata ]
+    ActiveRecord::Base.connection.disable_referential_integrity do
+      tables.each do |table|
+        ActiveRecord::Base.connection.execute("TRUNCATE TABLE #{table} RESTART IDENTITY CASCADE")
+      end
+    end
+  end
+
+  config.before do
+    tables = ActiveRecord::Base.connection.tables - %w[ schema_migrations ar_internal_metadata ]
+    ActiveRecord::Base.connection.disable_referential_integrity do
+      tables.each do |table|
+        ActiveRecord::Base.connection.execute("TRUNCATE TABLE #{table} RESTART IDENTITY CASCADE")
+      end
+    end
+  end
 end

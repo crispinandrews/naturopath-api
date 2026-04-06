@@ -112,6 +112,8 @@ All list endpoints support date range filtering via query parameters:
 GET /api/v1/client/food_entries?from=2026-04-01&to=2026-04-07
 ```
 
+Date-only filters are interpreted in the app time zone. `from` uses the start of the day, `to` uses the end of the day, and invalid date filters return `422 Unprocessable Entity`.
+
 ## Data Model
 
 - **Practitioner** — The naturopath. Manages clients via the dashboard.

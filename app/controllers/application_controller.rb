@@ -1,4 +1,8 @@
 class ApplicationController < ActionController::API
+  class InvalidDateFilterError < StandardError; end
+
+  rescue_from InvalidDateFilterError, with: :render_invalid_date_filter
+
   private
 
   def authenticate_practitioner!
@@ -36,5 +40,9 @@ class ApplicationController < ActionController::API
 
   def render_validation_errors(record)
     render json: { errors: record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  def render_invalid_date_filter(error)
+    render json: { error: error.message }, status: :unprocessable_entity
   end
 end
