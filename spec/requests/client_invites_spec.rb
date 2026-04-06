@@ -2,14 +2,16 @@ require "rails_helper"
 
 RSpec.describe "Client invites", type: :request do
   it "rejects invite acceptance without an invite token" do
+    suffix = SecureRandom.hex(4)
+
     practitioner = Practitioner.create!(
-      email: "practitioner@example.com",
+      email: "practitioner-#{suffix}@example.com",
       password: "password123",
       first_name: "Pat",
       last_name: "Doctor"
     )
     client = practitioner.clients.create!(
-      email: "client@example.com",
+      email: "client-#{suffix}@example.com",
       password: "originalpass",
       first_name: "Casey",
       last_name: "Patient",

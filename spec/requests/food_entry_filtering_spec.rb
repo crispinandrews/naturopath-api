@@ -2,14 +2,16 @@ require "rails_helper"
 
 RSpec.describe "Food entry filtering", type: :request do
   before do
+    suffix = SecureRandom.hex(4)
+
     @practitioner = Practitioner.create!(
-      email: "filter-practitioner@example.com",
+      email: "filter-practitioner-#{suffix}@example.com",
       password: "password123",
       first_name: "Fran",
       last_name: "Healer"
     )
     @client = @practitioner.clients.create!(
-      email: "filter-client@example.com",
+      email: "filter-client-#{suffix}@example.com",
       password: "password123",
       first_name: "Taylor",
       last_name: "Client",
