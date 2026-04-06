@@ -25,8 +25,7 @@ RSpec.describe "GDPR endpoints", type: :request do
   it "requires client authentication for export" do
     post "/api/v1/gdpr/export"
 
-    expect(response).to have_http_status(:unauthorized)
-    expect(json_response).to eq({ "error" => "Unauthorized" })
+    expect_error_response(status: :unauthorized, code: "unauthorized", message: "Unauthorized")
   end
 
   it "exports the client's profile and health data" do
@@ -65,8 +64,8 @@ RSpec.describe "GDPR endpoints", type: :request do
 
     delete "/api/v1/gdpr/delete", headers: auth_headers_for(@client)
 
-    expect(response).to have_http_status(422)
-    expect(json_response["errors"]).not_to be_empty
+    expect_error_response(status: 422, code: "validation_failed", message: "Validation failed")
+    expect(json_response.dig("error", "details")).not_to be_empty
     expect(@client.food_entries.count).to eq(1)
     expect(@client.symptoms.count).to eq(1)
     expect(@client.energy_logs.count).to eq(1)

@@ -29,8 +29,8 @@ RSpec.describe "Practitioner authentication", type: :request do
       },
       as: :json
 
-    expect(response).to have_http_status(422)
-    expect(json_response["errors"]).not_to be_empty
+    expect_error_response(status: 422, code: "validation_failed", message: "Validation failed")
+    expect(json_response.dig("error", "details")).not_to be_empty
   end
 
   it "logs in an existing practitioner" do
@@ -58,7 +58,31 @@ RSpec.describe "Practitioner authentication", type: :request do
       },
       as: :json
 
-    expect(response).to have_http_status(:unauthorized)
-    expect(json_response).to eq({ "error" => "Invalid email or password" })
+    expect_error_response(status: :unauthorized, code: "invalid_credentials", message: "Invalid email or password")
+  end
+
+  it "rate limits repeated failed practitioner logins" do
+    practitioner = create_practitioner(password: "password123")
+
+    10.times do
+      post "/api/v1/practitioner/login",
+        params: {
+          email: practitioner.email,
+          password: "wrong-password"
+        },
+        headers: { "REMOTE_ADDR" => "203.0.113.51" },
+        as: :json
+    end
+
+    post "/api/v1/practitioner/login",
+      params: {
+        email: practitioner.email,
+        password: "wrong-password"
+      },
+      headers: { "REMOTE_ADDR" => "203.0.113.51" },
+      as: :json
+
+    expect_error_response(status: :too_many_requests, code: "rate_limited", message: "Too many requests. Try again later.")
+    expect(response.headers["Retry-After"]).to be_present
   end
 end

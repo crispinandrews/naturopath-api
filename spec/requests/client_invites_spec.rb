@@ -37,8 +37,7 @@ RSpec.describe "Client invites", type: :request do
 
     post "/api/v1/client/accept_invite", params: { password: "newpassword123" }, as: :json
 
-    expect(response).to have_http_status(:not_found)
-    expect(json_response).to eq({ "error" => "Invalid or expired invite" })
+    expect_error_response(status: :not_found, code: "invite_not_found", message: "Invalid invite")
     expect(client.reload.authenticate("originalpass")).to be_truthy
     expect(client.authenticate("newpassword123")).to be(false)
   end
@@ -54,8 +53,7 @@ RSpec.describe "Client invites", type: :request do
       },
       as: :json
 
-    expect(response).to have_http_status(:unauthorized)
-    expect(json_response).to eq({ "error" => "Invalid email or password" })
+    expect_error_response(status: :unauthorized, code: "invalid_credentials", message: "Invalid email or password")
   end
 
   it "rejects invite acceptance with an invalid password" do
@@ -69,9 +67,44 @@ RSpec.describe "Client invites", type: :request do
       },
       as: :json
 
-    expect(response).to have_http_status(422)
-    expect(json_response["errors"]).to include("Password is too short (minimum is 8 characters)")
+    expect_error_response(status: 422, code: "validation_failed", message: "Validation failed")
+    expect(json_response.dig("error", "details")).to include("Password is too short (minimum is 8 characters)")
     expect(client.reload.invite_accepted_at).to be_nil
     expect(client.invite_token).to be_present
+  end
+
+  it "rejects expired invites" do
+    practitioner = create_practitioner
+    client = create_client(practitioner: practitioner, accepted: false, invite_expires_at: 1.hour.ago)
+
+    post "/api/v1/client/accept_invite",
+      params: {
+        invite_token: client.invite_token,
+        password: "newpassword123"
+      },
+      as: :json
+
+    expect_error_response(status: :gone, code: "invite_expired", message: "Invite has expired")
+    expect(client.reload.invite_accepted_at).to be_nil
+  end
+
+  it "rate limits repeated invite acceptance attempts" do
+    practitioner = create_practitioner
+    client = create_client(practitioner: practitioner, accepted: false)
+
+    5.times do
+      post "/api/v1/client/accept_invite",
+        params: { invite_token: client.invite_token, password: "short" },
+        headers: { "REMOTE_ADDR" => "203.0.113.50" },
+        as: :json
+    end
+
+    post "/api/v1/client/accept_invite",
+      params: { invite_token: client.invite_token, password: "short" },
+      headers: { "REMOTE_ADDR" => "203.0.113.50" },
+      as: :json
+
+    expect_error_response(status: :too_many_requests, code: "rate_limited", message: "Too many requests. Try again later.")
+    expect(response.headers["Retry-After"]).to be_present
   end
 end

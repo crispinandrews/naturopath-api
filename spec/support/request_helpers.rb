@@ -27,7 +27,7 @@ module RequestHelpers
         password: password,
         invite_accepted_at: invite_accepted_at
       ))
-      client.update_columns(invite_token: nil)
+      client.update_columns(invite_token: nil, invite_expires_at: nil)
       client
     else
       practitioner.clients.create!(defaults.merge(attrs))
@@ -36,6 +36,13 @@ module RequestHelpers
 
   def json_response
     response.parsed_body
+  end
+
+  def expect_error_response(status:, code:, message:)
+    expect(response).to have_http_status(status)
+    expect(json_response.dig("error", "code")).to eq(code)
+    expect(json_response.dig("error", "message")).to eq(message)
+    expect(json_response.dig("error", "request_id")).to be_present
   end
 end
 

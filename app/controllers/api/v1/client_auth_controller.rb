@@ -1,6 +1,16 @@
 module Api
   module V1
     class ClientAuthController < BaseController
+      include RateLimitable
+
+      before_action only: :login do
+        throttle!(bucket: "client-login", limit: 10, period: 10.minutes, scope: normalized_email_param)
+      end
+
+      before_action only: :accept_invite do
+        throttle!(bucket: "client-invite-accept", limit: 5, period: 10.minutes, scope: params[:invite_token].to_s.strip)
+      end
+
       def login
         client = ::Client.find_by(email: params[:email])
 
@@ -8,10 +18,11 @@ module Api
           token = JwtService.encode({ user_id: client.id, user_type: "Client" })
           render json: {
             token: token,
-            client: client_json(client)
+            client: ClientSerializer.as_json(client)
           }
         else
-          render json: { error: "Invalid email or password" }, status: :unauthorized
+          AppEventLogger.warn("auth.client_login_failed", **request_context(email: normalized_email_param))
+          render_error(code: "invalid_credentials", message: "Invalid email or password", status: :unauthorized)
         end
       end
 
@@ -20,35 +31,30 @@ module Api
         return render_invalid_invite unless invite_token.present?
 
         client = ::Client.where(invite_accepted_at: nil).find_by(invite_token: invite_token)
-
-        if client.nil?
-          return render_invalid_invite
-        end
+        return render_invalid_invite if client.nil?
+        return render_expired_invite(client) if client.invite_expired?
 
         client.accept_invite!(password: params[:password])
         token = JwtService.encode({ user_id: client.id, user_type: "Client" })
         render json: {
           token: token,
-          client: client_json(client)
+          client: ClientSerializer.as_json(client)
         }
+      rescue ::Client::ExpiredInviteError
+        render_expired_invite(client)
       rescue ActiveRecord::RecordInvalid => e
-        render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+        render_validation_errors(e.record)
       end
 
       private
 
       def render_invalid_invite
-        render json: { error: "Invalid or expired invite" }, status: :not_found
+        render_error(code: "invite_not_found", message: "Invalid invite", status: :not_found)
       end
 
-      def client_json(client)
-        {
-          id: client.id,
-          email: client.email,
-          first_name: client.first_name,
-          last_name: client.last_name,
-          practitioner_id: client.practitioner_id
-        }
+      def render_expired_invite(client)
+        AppEventLogger.warn("auth.client_invite_expired", **request_context(client_id: client.id))
+        render_error(code: "invite_expired", message: "Invite has expired", status: :gone)
       end
     end
   end

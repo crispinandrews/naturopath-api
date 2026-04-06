@@ -4,8 +4,7 @@ RSpec.describe "Practitioner client management", type: :request do
   it "requires practitioner authentication" do
     get "/api/v1/clients"
 
-    expect(response).to have_http_status(:unauthorized)
-    expect(json_response).to eq({ "error" => "Unauthorized" })
+    expect_error_response(status: :unauthorized, code: "unauthorized", message: "Unauthorized")
   end
 
   it "lists only the practitioner's own clients" do
@@ -38,6 +37,7 @@ RSpec.describe "Practitioner client management", type: :request do
     expect(response).to have_http_status(:created)
     expect(json_response["invite_token"]).to be_present
     expect(json_response["invite_accepted"]).to be(false)
+    expect(json_response["invite_expires_at"]).to be_present
   end
 
   it "shows an owned client" do
@@ -57,8 +57,7 @@ RSpec.describe "Practitioner client management", type: :request do
 
     get "/api/v1/clients/#{foreign_client.id}", headers: auth_headers_for(practitioner)
 
-    expect(response).to have_http_status(:not_found)
-    expect(json_response).to eq({ "error" => "Not found" })
+    expect_error_response(status: :not_found, code: "not_found", message: "Not found")
   end
 
   it "updates an owned client" do
@@ -87,8 +86,8 @@ RSpec.describe "Practitioner client management", type: :request do
       headers: auth_headers_for(practitioner),
       as: :json
 
-    expect(response).to have_http_status(422)
-    expect(json_response["errors"]).to include("Email is invalid")
+    expect_error_response(status: 422, code: "validation_failed", message: "Validation failed")
+    expect(json_response.dig("error", "details")).to include("Email is invalid")
   end
 
   it "deletes an owned client" do

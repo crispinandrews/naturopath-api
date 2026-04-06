@@ -126,8 +126,7 @@ RSpec.describe "Health record endpoints", type: :request do
     it "requires client authentication for #{resource_name} index" do
       get client_collection_path(resource_name)
 
-      expect(response).to have_http_status(:unauthorized)
-      expect(json_response).to eq({ "error" => "Unauthorized" })
+      expect_error_response(status: :unauthorized, code: "unauthorized", message: "Unauthorized")
     end
 
     it "lists only the authenticated client's #{resource_name}" do
@@ -155,8 +154,7 @@ RSpec.describe "Health record endpoints", type: :request do
 
       get client_member_path(resource_name, sibling_record), headers: auth_headers_for(owned_client)
 
-      expect(response).to have_http_status(:not_found)
-      expect(json_response).to eq({ "error" => "Not found" })
+      expect_error_response(status: :not_found, code: "not_found", message: "Not found")
     end
 
     it "creates a new #{resource_name.to_s.singularize}" do
@@ -177,8 +175,8 @@ RSpec.describe "Health record endpoints", type: :request do
         headers: auth_headers_for(owned_client),
         as: :json
 
-      expect(response).to have_http_status(422)
-      expect(json_response["errors"]).not_to be_empty
+      expect_error_response(status: 422, code: "validation_failed", message: "Validation failed")
+      expect(json_response.dig("error", "details")).not_to be_empty
     end
 
     it "updates the authenticated client's #{resource_name.to_s.singularize}" do
@@ -203,8 +201,8 @@ RSpec.describe "Health record endpoints", type: :request do
         headers: auth_headers_for(owned_client),
         as: :json
 
-      expect(response).to have_http_status(422)
-      expect(json_response["errors"]).not_to be_empty
+      expect_error_response(status: 422, code: "validation_failed", message: "Validation failed")
+      expect(json_response.dig("error", "details")).not_to be_empty
     end
 
     it "deletes the authenticated client's #{resource_name.to_s.singularize}" do
@@ -232,8 +230,7 @@ RSpec.describe "Health record endpoints", type: :request do
 
       get practitioner_collection_path(foreign_client, resource_name), headers: auth_headers_for(practitioner)
 
-      expect(response).to have_http_status(:not_found)
-      expect(json_response).to eq({ "error" => "Not found" })
+      expect_error_response(status: :not_found, code: "not_found", message: "Not found")
     end
   end
 

@@ -33,5 +33,7 @@ RSpec.configure do |config|
         ActiveRecord::Base.connection.execute("TRUNCATE TABLE #{table} RESTART IDENTITY CASCADE")
       end
     end
+
+    ApiRateLimiter.reset!
   end
 end

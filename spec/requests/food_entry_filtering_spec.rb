@@ -60,7 +60,6 @@ RSpec.describe "Food entry filtering", type: :request do
       params: { from: "not-a-date" },
       headers: auth_headers_for(@client)
 
-    expect(response).to have_http_status(422)
-    expect(json_response).to eq({ "error" => "Invalid from date filter" })
+    expect_error_response(status: 422, code: "invalid_date_filter", message: "Invalid from date filter")
   end
 end

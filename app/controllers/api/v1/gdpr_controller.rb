@@ -22,6 +22,7 @@ module Api
           consents: @current_client.consents.order(:created_at)
         }
 
+        AppEventLogger.info("gdpr.data_exported", **request_context(client_id: @current_client.id))
         render json: { exported_at: Time.current, data: data }
       end
 
@@ -44,6 +45,7 @@ module Api
           )
         end
 
+        AppEventLogger.info("gdpr.data_deleted", **request_context(client_id: @current_client.id))
         render json: { message: "All health data has been deleted", deleted_at: Time.current }
       rescue ActiveRecord::RecordInvalid => e
         render_validation_errors(e.record)

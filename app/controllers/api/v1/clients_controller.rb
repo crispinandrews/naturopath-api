@@ -6,18 +6,18 @@ module Api
 
       def index
         clients = @current_practitioner.clients.order(:last_name, :first_name)
-        render json: clients.map { |c| client_json(c) }
+        render json: clients.map { |client| ClientSerializer.as_json(client, include_invite: true) }
       end
 
       def show
-        render json: client_json(@client)
+        render json: ClientSerializer.as_json(@client, include_invite: true)
       end
 
       def create
         client = @current_practitioner.clients.new(client_params)
 
         if client.save
-          render json: client_json(client), status: :created
+          render json: ClientSerializer.as_json(client, include_invite: true), status: :created
         else
           render_validation_errors(client)
         end
@@ -25,7 +25,7 @@ module Api
 
       def update
         if @client.update(client_params)
-          render json: client_json(@client)
+          render json: ClientSerializer.as_json(@client, include_invite: true)
         else
           render_validation_errors(@client)
         end
@@ -45,19 +45,6 @@ module Api
 
       def client_params
         params.permit(:email, :first_name, :last_name, :date_of_birth)
-      end
-
-      def client_json(client)
-        {
-          id: client.id,
-          email: client.email,
-          first_name: client.first_name,
-          last_name: client.last_name,
-          date_of_birth: client.date_of_birth,
-          invite_token: client.invite_token,
-          invite_accepted: client.invite_accepted_at.present?,
-          created_at: client.created_at
-        }
       end
     end
   end
