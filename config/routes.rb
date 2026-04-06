@@ -12,27 +12,27 @@ Rails.application.routes.draw do
       post "client/accept_invite", to: "client_auth#accept_invite"
 
       # Practitioner-facing: manage clients
-      resources :clients, only: [:index, :show, :create, :update, :destroy]
+      resources :clients, only: [ :index, :show, :create, :update, :destroy ]
 
       # Practitioner-facing: view client entries
       resources :clients, only: [] do
-        resources :food_entries, only: [:index], controller: "practitioner/food_entries"
-        resources :symptoms, only: [:index], controller: "practitioner/symptoms"
-        resources :energy_logs, only: [:index], controller: "practitioner/energy_logs"
-        resources :sleep_logs, only: [:index], controller: "practitioner/sleep_logs"
-        resources :water_intakes, only: [:index], controller: "practitioner/water_intakes"
-        resources :supplements, only: [:index], controller: "practitioner/supplements"
+        resources :food_entries, only: [ :index ], controller: "practitioner/food_entries"
+        resources :symptoms, only: [ :index ], controller: "practitioner/symptoms"
+        resources :energy_logs, only: [ :index ], controller: "practitioner/energy_logs"
+        resources :sleep_logs, only: [ :index ], controller: "practitioner/sleep_logs"
+        resources :water_intakes, only: [ :index ], controller: "practitioner/water_intakes"
+        resources :supplements, only: [ :index ], controller: "practitioner/supplements"
       end
 
       # Client-facing: manage own entries
       namespace :client do
-        resources :food_entries, only: [:index, :show, :create, :update, :destroy]
-        resources :symptoms, only: [:index, :show, :create, :update, :destroy]
-        resources :energy_logs, only: [:index, :show, :create, :update, :destroy]
-        resources :sleep_logs, only: [:index, :show, :create, :update, :destroy]
-        resources :water_intakes, only: [:index, :show, :create, :update, :destroy]
-        resources :supplements, only: [:index, :show, :create, :update, :destroy]
-        resources :consents, only: [:index, :create]
+        resources :food_entries, only: [ :index, :show, :create, :update, :destroy ]
+        resources :symptoms, only: [ :index, :show, :create, :update, :destroy ]
+        resources :energy_logs, only: [ :index, :show, :create, :update, :destroy ]
+        resources :sleep_logs, only: [ :index, :show, :create, :update, :destroy ]
+        resources :water_intakes, only: [ :index, :show, :create, :update, :destroy ]
+        resources :supplements, only: [ :index, :show, :create, :update, :destroy ]
+        resources :consents, only: [ :index, :create ]
         get "profile", to: "profile#show"
       end
 

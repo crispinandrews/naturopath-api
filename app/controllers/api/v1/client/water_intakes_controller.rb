@@ -2,10 +2,10 @@ module Api
   module V1
     module Client
       class WaterIntakesController < BaseController
-        before_action :set_water_intake, only: [:show, :update, :destroy]
+        before_action :set_water_intake, only: [ :show, :update, :destroy ]
 
         def index
-          intakes = filter_by_date_range(@current_client.water_intakes).order(recorded_at: :desc)
+          intakes = filter_by_date_range(@current_client.water_intakes, :recorded_at).order(recorded_at: :desc)
           render json: intakes
         end
 

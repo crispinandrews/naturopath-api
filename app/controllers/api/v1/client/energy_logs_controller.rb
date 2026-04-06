@@ -2,10 +2,10 @@ module Api
   module V1
     module Client
       class EnergyLogsController < BaseController
-        before_action :set_energy_log, only: [:show, :update, :destroy]
+        before_action :set_energy_log, only: [ :show, :update, :destroy ]
 
         def index
-          logs = filter_by_date_range(@current_client.energy_logs).order(recorded_at: :desc)
+          logs = filter_by_date_range(@current_client.energy_logs, :recorded_at).order(recorded_at: :desc)
           render json: logs
         end
 

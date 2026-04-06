@@ -16,10 +16,13 @@ module Api
       end
 
       def accept_invite
-        client = ::Client.find_by(invite_token: params[:invite_token])
+        invite_token = params[:invite_token].to_s.strip
+        return render_invalid_invite unless invite_token.present?
+
+        client = ::Client.where(invite_accepted_at: nil).find_by(invite_token: invite_token)
 
         if client.nil?
-          return render json: { error: "Invalid or expired invite" }, status: :not_found
+          return render_invalid_invite
         end
 
         client.accept_invite!(password: params[:password])
@@ -33,6 +36,10 @@ module Api
       end
 
       private
+
+      def render_invalid_invite
+        render json: { error: "Invalid or expired invite" }, status: :not_found
+      end
 
       def client_json(client)
         {

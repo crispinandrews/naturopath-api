@@ -10,6 +10,6 @@ class CreateFoodEntries < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :food_entries, [:patient_id, :consumed_at]
+    add_index :food_entries, [ :patient_id, :consumed_at ]
   end
 end

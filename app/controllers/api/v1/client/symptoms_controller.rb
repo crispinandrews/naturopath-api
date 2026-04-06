@@ -2,10 +2,10 @@ module Api
   module V1
     module Client
       class SymptomsController < BaseController
-        before_action :set_symptom, only: [:show, :update, :destroy]
+        before_action :set_symptom, only: [ :show, :update, :destroy ]
 
         def index
-          symptoms = filter_by_date_range(@current_client.symptoms).order(occurred_at: :desc)
+          symptoms = filter_by_date_range(@current_client.symptoms, :occurred_at).order(occurred_at: :desc)
           render json: symptoms
         end
 

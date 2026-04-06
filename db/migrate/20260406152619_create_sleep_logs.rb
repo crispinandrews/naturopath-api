@@ -11,6 +11,6 @@ class CreateSleepLogs < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :sleep_logs, [:patient_id, :bedtime]
+    add_index :sleep_logs, [ :patient_id, :bedtime ]
   end
 end

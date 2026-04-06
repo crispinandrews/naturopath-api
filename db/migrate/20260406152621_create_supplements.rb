@@ -10,6 +10,6 @@ class CreateSupplements < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :supplements, [:patient_id, :taken_at]
+    add_index :supplements, [ :patient_id, :taken_at ]
   end
 end

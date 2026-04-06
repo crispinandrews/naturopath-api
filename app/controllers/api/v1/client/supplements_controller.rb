@@ -2,10 +2,10 @@ module Api
   module V1
     module Client
       class SupplementsController < BaseController
-        before_action :set_supplement, only: [:show, :update, :destroy]
+        before_action :set_supplement, only: [ :show, :update, :destroy ]
 
         def index
-          supplements = filter_by_date_range(@current_client.supplements).order(taken_at: :desc)
+          supplements = filter_by_date_range(@current_client.supplements, :taken_at).order(taken_at: :desc)
           render json: supplements
         end
 

@@ -9,6 +9,6 @@ class CreateEnergyLogs < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :energy_logs, [:patient_id, :recorded_at]
+    add_index :energy_logs, [ :patient_id, :recorded_at ]
   end
 end

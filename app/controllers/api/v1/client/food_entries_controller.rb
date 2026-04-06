@@ -2,10 +2,10 @@ module Api
   module V1
     module Client
       class FoodEntriesController < BaseController
-        before_action :set_food_entry, only: [:show, :update, :destroy]
+        before_action :set_food_entry, only: [ :show, :update, :destroy ]
 
         def index
-          entries = filter_by_date_range(@current_client.food_entries).order(consumed_at: :desc)
+          entries = filter_by_date_range(@current_client.food_entries, :consumed_at).order(consumed_at: :desc)
           render json: entries
         end
 

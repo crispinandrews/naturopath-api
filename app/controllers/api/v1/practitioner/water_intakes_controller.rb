@@ -3,7 +3,7 @@ module Api
     module Practitioner
       class WaterIntakesController < BaseController
         def index
-          intakes = filter_by_date_range(@client.water_intakes).order(recorded_at: :desc)
+          intakes = filter_by_date_range(@client.water_intakes, :recorded_at).order(recorded_at: :desc)
           render json: intakes
         end
       end

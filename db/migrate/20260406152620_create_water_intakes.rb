@@ -8,6 +8,6 @@ class CreateWaterIntakes < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :water_intakes, [:patient_id, :recorded_at]
+    add_index :water_intakes, [ :patient_id, :recorded_at ]
   end
 end

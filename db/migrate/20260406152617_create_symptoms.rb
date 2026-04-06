@@ -11,6 +11,6 @@ class CreateSymptoms < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :symptoms, [:patient_id, :occurred_at]
+    add_index :symptoms, [ :patient_id, :occurred_at ]
   end
 end

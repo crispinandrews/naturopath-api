@@ -3,7 +3,7 @@ module Api
     module Practitioner
       class SupplementsController < BaseController
         def index
-          supplements = filter_by_date_range(@client.supplements).order(taken_at: :desc)
+          supplements = filter_by_date_range(@client.supplements, :taken_at).order(taken_at: :desc)
           render json: supplements
         end
       end

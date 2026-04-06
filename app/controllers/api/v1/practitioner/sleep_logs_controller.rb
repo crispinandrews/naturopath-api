@@ -3,7 +3,7 @@ module Api
     module Practitioner
       class SleepLogsController < BaseController
         def index
-          logs = filter_by_date_range(@client.sleep_logs).order(bedtime: :desc)
+          logs = filter_by_date_range(@client.sleep_logs, :bedtime).order(bedtime: :desc)
           render json: logs
         end
       end

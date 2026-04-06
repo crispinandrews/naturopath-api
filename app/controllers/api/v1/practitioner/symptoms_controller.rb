@@ -3,7 +3,7 @@ module Api
     module Practitioner
       class SymptomsController < BaseController
         def index
-          symptoms = filter_by_date_range(@client.symptoms).order(occurred_at: :desc)
+          symptoms = filter_by_date_range(@client.symptoms, :occurred_at).order(occurred_at: :desc)
           render json: symptoms
         end
       end

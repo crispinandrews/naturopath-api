@@ -11,6 +11,6 @@ class CreateConsents < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :consents, [:patient_id, :consent_type]
+    add_index :consents, [ :patient_id, :consent_type ]
   end
 end

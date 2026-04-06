@@ -2,10 +2,10 @@ module Api
   module V1
     module Client
       class SleepLogsController < BaseController
-        before_action :set_sleep_log, only: [:show, :update, :destroy]
+        before_action :set_sleep_log, only: [ :show, :update, :destroy ]
 
         def index
-          logs = filter_by_date_range(@current_client.sleep_logs).order(bedtime: :desc)
+          logs = filter_by_date_range(@current_client.sleep_logs, :bedtime).order(bedtime: :desc)
           render json: logs
         end
 

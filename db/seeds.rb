@@ -44,18 +44,18 @@ base_date = 7.days.ago.beginning_of_day
   # Food entries
   FoodEntry.find_or_create_by!(client: client1, consumed_at: date + 8.hours) do |e|
     e.meal_type = "breakfast"
-    e.description = ["Oatmeal with berries", "Toast with avocado", "Smoothie bowl", "Eggs and vegetables", "Yogurt with granola", "Fruit salad", "Pancakes with honey"].sample
+    e.description = [ "Oatmeal with berries", "Toast with avocado", "Smoothie bowl", "Eggs and vegetables", "Yogurt with granola", "Fruit salad", "Pancakes with honey" ].sample
     e.notes = "Felt good after eating"
   end
 
   FoodEntry.find_or_create_by!(client: client1, consumed_at: date + 13.hours) do |e|
     e.meal_type = "lunch"
-    e.description = ["Grilled chicken salad", "Vegetable soup", "Quinoa bowl", "Fish with rice", "Lentil stew", "Pasta with vegetables", "Wrap with hummus"].sample
+    e.description = [ "Grilled chicken salad", "Vegetable soup", "Quinoa bowl", "Fish with rice", "Lentil stew", "Pasta with vegetables", "Wrap with hummus" ].sample
   end
 
   FoodEntry.find_or_create_by!(client: client1, consumed_at: date + 19.hours) do |e|
     e.meal_type = "dinner"
-    e.description = ["Salmon with sweet potato", "Stir-fry vegetables", "Bean curry", "Grilled vegetables with couscous", "Chicken soup", "Roasted vegetables", "Fish stew"].sample
+    e.description = [ "Salmon with sweet potato", "Stir-fry vegetables", "Bean curry", "Grilled vegetables with couscous", "Chicken soup", "Roasted vegetables", "Fish stew" ].sample
   end
 
   # Energy log
@@ -79,7 +79,7 @@ base_date = 7.days.ago.beginning_of_day
   # Water intake
   3.times do |i|
     WaterIntake.find_or_create_by!(client: client1, recorded_at: date + (8 + i * 4).hours) do |w|
-      w.amount_ml = [250, 330, 500].sample
+      w.amount_ml = [ 250, 330, 500 ].sample
     end
   end
 
