@@ -1,0 +1,2003 @@
+openapi: 3.1.0
+info:
+  title: NaturoPath API
+  version: v1
+  description: REST API for practitioner-led health tracking, client mobile logging, invites, consent, sync, and GDPR flows.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: https://api.example.com
+    description: Production placeholder
+security:
+  - bearerAuth: []
+tags:
+  - name: Practitioner Auth
+  - name: Client Auth
+  - name: Practitioner Clients
+  - name: Practitioner Health Records
+  - name: Client Profile
+  - name: Client Health Records
+  - name: Client Consents
+  - name: Client Sync
+  - name: GDPR
+paths:
+  /api/v1/practitioner/login:
+    post:
+      tags: [Practitioner Auth]
+      summary: Log in a practitioner
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Practitioner authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PractitionerAuthResponse"
+        "401":
+          $ref: "#/components/responses/InvalidCredentials"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/client/login:
+    post:
+      tags: [Client Auth]
+      summary: Log in a client
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Client authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientAuthResponse"
+        "401":
+          $ref: "#/components/responses/InvalidCredentials"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/client/accept_invite:
+    post:
+      tags: [Client Auth]
+      summary: Accept a client invite and set the initial password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invite_token, password]
+              properties:
+                invite_token:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+      responses:
+        "200":
+          description: Invite accepted and client authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientAuthResponse"
+        "404":
+          description: Invalid invite token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "410":
+          description: Invite expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/client/forgot_password:
+    post:
+      tags: [Client Auth]
+      summary: Request a client password reset email
+      description: Always returns 204 so callers cannot enumerate registered client emails.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "204":
+          description: Password reset request accepted if the account exists
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/client/reset_password:
+    post:
+      tags: [Client Auth]
+      summary: Reset a client password using a reset token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reset_token, password]
+              properties:
+                reset_token:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+      responses:
+        "200":
+          description: Password reset and client authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientAuthResponse"
+        "401":
+          description: Invalid reset token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/client/refresh:
+    post:
+      tags: [Client Auth]
+      summary: Rotate a refresh token and issue a new access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        "200":
+          description: New access and refresh tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientAuthResponse"
+        "401":
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/client/logout:
+    post:
+      tags: [Client Auth]
+      summary: Revoke a client refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        "204":
+          description: Refresh token revoked if it exists
+
+  /api/v1/clients:
+    get:
+      tags: [Practitioner Clients]
+      summary: List clients for the authenticated practitioner
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Paginated client list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidPagination"
+    post:
+      tags: [Practitioner Clients]
+      summary: Create a pending client invite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientWriteRequest"
+      responses:
+        "201":
+          description: Client invite created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientWithInviteEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/clients/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Practitioner Clients]
+      summary: Show an owned client
+      responses:
+        "200":
+          description: Client detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Practitioner Clients]
+      summary: Update an owned client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientWriteRequest"
+      responses:
+        "200":
+          description: Client updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    delete:
+      tags: [Practitioner Clients]
+      summary: Delete an owned client
+      responses:
+        "204":
+          description: Client deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/clients/{id}/resend_invite:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      tags: [Practitioner Clients]
+      summary: Rotate and resend a pending client invite
+      responses:
+        "200":
+          description: Invite resent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientWithInviteEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: Invite has already been accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/client/profile:
+    get:
+      tags: [Client Profile]
+      summary: Show the authenticated client's profile
+      responses:
+        "200":
+          description: Client profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientProfileEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      tags: [Client Profile]
+      summary: Update the authenticated client's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientProfileUpdateRequest"
+      responses:
+        "200":
+          description: Client profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientProfileEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/client/password:
+    patch:
+      tags: [Client Profile]
+      summary: Change the authenticated client's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password:
+                  type: string
+                new_password:
+                  type: string
+                  minLength: 8
+      responses:
+        "200":
+          description: Password changed and new tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientAuthResponse"
+        "401":
+          description: Unauthorized or invalid current password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/client/consents:
+    get:
+      tags: [Client Consents]
+      summary: List consents for the authenticated client
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Paginated consent list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidPagination"
+    post:
+      tags: [Client Consents]
+      summary: Create a consent record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [consent_type, version]
+              properties:
+                consent_type:
+                  type: string
+                version:
+                  type: string
+      responses:
+        "201":
+          description: Consent recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/client/sync:
+    post:
+      tags: [Client Sync]
+      summary: Sync queued client health-record operations
+      description: Processes a batch of upsert/delete operations and returns per-operation results. Individual invalid operations fail without rejecting the entire batch.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncRequest"
+      responses:
+        "200":
+          description: Sync results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          description: Malformed sync payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/gdpr/export:
+    post:
+      tags: [GDPR]
+      summary: Export all personal data for the authenticated client
+      responses:
+        "200":
+          description: GDPR data export
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GdprExportResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/gdpr/delete:
+    delete:
+      tags: [GDPR]
+      summary: Delete all health data for the authenticated client
+      responses:
+        "200":
+          description: Health data deleted and erasure consent retained
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Health data deleted successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/client/food_entries:
+    get:
+      tags: [Client Health Records]
+      summary: List the authenticated client's food entries
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Paginated food entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FoodEntryCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidListQuery"
+    post:
+      tags: [Client Health Records]
+      summary: Create a food entry
+      requestBody:
+        $ref: "#/components/requestBodies/FoodEntry"
+      responses:
+        "201":
+          $ref: "#/components/responses/FoodEntryCreated"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/client/food_entries/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Client Health Records]
+      summary: Show a food entry
+      responses:
+        "200":
+          $ref: "#/components/responses/FoodEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Client Health Records]
+      summary: Update a food entry
+      requestBody:
+        $ref: "#/components/requestBodies/FoodEntry"
+      responses:
+        "200":
+          $ref: "#/components/responses/FoodEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    delete:
+      tags: [Client Health Records]
+      summary: Delete a food entry
+      responses:
+        "204":
+          description: Food entry deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/client/symptoms:
+    get:
+      tags: [Client Health Records]
+      summary: List the authenticated client's symptoms
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Paginated symptoms
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SymptomCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidListQuery"
+    post:
+      tags: [Client Health Records]
+      summary: Create a symptom
+      requestBody:
+        $ref: "#/components/requestBodies/Symptom"
+      responses:
+        "201":
+          $ref: "#/components/responses/SymptomCreated"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/client/symptoms/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Client Health Records]
+      summary: Show a symptom
+      responses:
+        "200":
+          $ref: "#/components/responses/Symptom"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Client Health Records]
+      summary: Update a symptom
+      requestBody:
+        $ref: "#/components/requestBodies/Symptom"
+      responses:
+        "200":
+          $ref: "#/components/responses/Symptom"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    delete:
+      tags: [Client Health Records]
+      summary: Delete a symptom
+      responses:
+        "204":
+          description: Symptom deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/client/energy_logs:
+    get:
+      tags: [Client Health Records]
+      summary: List the authenticated client's energy logs
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Paginated energy logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnergyLogCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidListQuery"
+    post:
+      tags: [Client Health Records]
+      summary: Create an energy log
+      requestBody:
+        $ref: "#/components/requestBodies/EnergyLog"
+      responses:
+        "201":
+          $ref: "#/components/responses/EnergyLogCreated"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/client/energy_logs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Client Health Records]
+      summary: Show an energy log
+      responses:
+        "200":
+          $ref: "#/components/responses/EnergyLog"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Client Health Records]
+      summary: Update an energy log
+      requestBody:
+        $ref: "#/components/requestBodies/EnergyLog"
+      responses:
+        "200":
+          $ref: "#/components/responses/EnergyLog"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    delete:
+      tags: [Client Health Records]
+      summary: Delete an energy log
+      responses:
+        "204":
+          description: Energy log deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/client/sleep_logs:
+    get:
+      tags: [Client Health Records]
+      summary: List the authenticated client's sleep logs
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Paginated sleep logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SleepLogCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidListQuery"
+    post:
+      tags: [Client Health Records]
+      summary: Create a sleep log
+      requestBody:
+        $ref: "#/components/requestBodies/SleepLog"
+      responses:
+        "201":
+          $ref: "#/components/responses/SleepLogCreated"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/client/sleep_logs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Client Health Records]
+      summary: Show a sleep log
+      responses:
+        "200":
+          $ref: "#/components/responses/SleepLog"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Client Health Records]
+      summary: Update a sleep log
+      requestBody:
+        $ref: "#/components/requestBodies/SleepLog"
+      responses:
+        "200":
+          $ref: "#/components/responses/SleepLog"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    delete:
+      tags: [Client Health Records]
+      summary: Delete a sleep log
+      responses:
+        "204":
+          description: Sleep log deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/client/water_intakes:
+    get:
+      tags: [Client Health Records]
+      summary: List the authenticated client's water intakes
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Paginated water intakes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaterIntakeCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidListQuery"
+    post:
+      tags: [Client Health Records]
+      summary: Create a water intake
+      requestBody:
+        $ref: "#/components/requestBodies/WaterIntake"
+      responses:
+        "201":
+          $ref: "#/components/responses/WaterIntakeCreated"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/client/water_intakes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Client Health Records]
+      summary: Show a water intake
+      responses:
+        "200":
+          $ref: "#/components/responses/WaterIntake"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Client Health Records]
+      summary: Update a water intake
+      requestBody:
+        $ref: "#/components/requestBodies/WaterIntake"
+      responses:
+        "200":
+          $ref: "#/components/responses/WaterIntake"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    delete:
+      tags: [Client Health Records]
+      summary: Delete a water intake
+      responses:
+        "204":
+          description: Water intake deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/client/supplements:
+    get:
+      tags: [Client Health Records]
+      summary: List the authenticated client's supplements
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Paginated supplements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplementCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidListQuery"
+    post:
+      tags: [Client Health Records]
+      summary: Create a supplement
+      requestBody:
+        $ref: "#/components/requestBodies/Supplement"
+      responses:
+        "201":
+          $ref: "#/components/responses/SupplementCreated"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/client/supplements/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Client Health Records]
+      summary: Show a supplement
+      responses:
+        "200":
+          $ref: "#/components/responses/Supplement"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Client Health Records]
+      summary: Update a supplement
+      requestBody:
+        $ref: "#/components/requestBodies/Supplement"
+      responses:
+        "200":
+          $ref: "#/components/responses/Supplement"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    delete:
+      tags: [Client Health Records]
+      summary: Delete a supplement
+      responses:
+        "204":
+          description: Supplement deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/clients/{client_id}/food_entries:
+    get:
+      tags: [Practitioner Health Records]
+      summary: List food entries for an owned client
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Paginated food entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FoodEntryCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/InvalidListQuery"
+
+  /api/v1/clients/{client_id}/symptoms:
+    get:
+      tags: [Practitioner Health Records]
+      summary: List symptoms for an owned client
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Paginated symptoms
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SymptomCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/InvalidListQuery"
+
+  /api/v1/clients/{client_id}/energy_logs:
+    get:
+      tags: [Practitioner Health Records]
+      summary: List energy logs for an owned client
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Paginated energy logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnergyLogCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/InvalidListQuery"
+
+  /api/v1/clients/{client_id}/sleep_logs:
+    get:
+      tags: [Practitioner Health Records]
+      summary: List sleep logs for an owned client
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Paginated sleep logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SleepLogCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/InvalidListQuery"
+
+  /api/v1/clients/{client_id}/water_intakes:
+    get:
+      tags: [Practitioner Health Records]
+      summary: List water intakes for an owned client
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Paginated water intakes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaterIntakeCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/InvalidListQuery"
+
+  /api/v1/clients/{client_id}/supplements:
+    get:
+      tags: [Practitioner Health Records]
+      summary: List supplements for an owned client
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Paginated supplements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplementCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/InvalidListQuery"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    ClientId:
+      name: client_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    From:
+      name: from
+      in: query
+      required: false
+      description: Start of date range. Date-only values use start of day in the app time zone.
+      schema:
+        type: string
+        examples: ["2026-04-01", "2026-04-01T10:00:00Z"]
+    To:
+      name: to
+      in: query
+      required: false
+      description: End of date range. Date-only values use end of day in the app time zone.
+      schema:
+        type: string
+        examples: ["2026-04-07", "2026-04-07T23:59:59Z"]
+
+  requestBodies:
+    FoodEntry:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/FoodEntryWriteRequest"
+    Symptom:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SymptomWriteRequest"
+    EnergyLog:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/EnergyLogWriteRequest"
+    SleepLog:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SleepLogWriteRequest"
+    WaterIntake:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WaterIntakeWriteRequest"
+    Supplement:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SupplementWriteRequest"
+
+  responses:
+    Unauthorized:
+      description: Missing, malformed, expired, or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    InvalidCredentials:
+      description: Invalid email or password
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    ValidationFailed:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    InvalidPagination:
+      description: Invalid pagination parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    InvalidListQuery:
+      description: Invalid date filter or pagination parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: Resource not found or not accessible to the authenticated user
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    FoodEntry:
+      description: Food entry
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/FoodEntryEnvelope"
+    FoodEntryCreated:
+      description: Food entry created
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/FoodEntryEnvelope"
+    Symptom:
+      description: Symptom
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SymptomEnvelope"
+    SymptomCreated:
+      description: Symptom created
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SymptomEnvelope"
+    EnergyLog:
+      description: Energy log
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/EnergyLogEnvelope"
+    EnergyLogCreated:
+      description: Energy log created
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/EnergyLogEnvelope"
+    SleepLog:
+      description: Sleep log
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SleepLogEnvelope"
+    SleepLogCreated:
+      description: Sleep log created
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SleepLogEnvelope"
+    WaterIntake:
+      description: Water intake
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WaterIntakeEnvelope"
+    WaterIntakeCreated:
+      description: Water intake created
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WaterIntakeEnvelope"
+    Supplement:
+      description: Supplement
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SupplementEnvelope"
+    SupplementCreated:
+      description: Supplement created
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SupplementEnvelope"
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    PractitionerAuthResponse:
+      type: object
+      required: [token, practitioner]
+      properties:
+        token:
+          type: string
+          description: JWT access token. Currently expires after 24 hours.
+        practitioner:
+          $ref: "#/components/schemas/Practitioner"
+
+    ClientAuthResponse:
+      type: object
+      required: [token, refresh_token, client]
+      properties:
+        token:
+          type: string
+          description: JWT access token. Currently expires after 24 hours.
+        refresh_token:
+          type: string
+          description: Long-lived refresh token. Currently expires after 30 days and rotates on refresh.
+        client:
+          $ref: "#/components/schemas/Client"
+
+    Practitioner:
+      type: object
+      required: [id, email, first_name, last_name]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        practice_name:
+          type: [string, "null"]
+
+    Client:
+      type: object
+      required: [id, email, first_name, last_name, practitioner_id, invite_accepted, created_at]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        date_of_birth:
+          type: [string, "null"]
+          format: date
+        practitioner_id:
+          type: integer
+        invite_accepted:
+          type: boolean
+        invite_expires_at:
+          type: string
+          format: date-time
+          description: Present only for pending invites.
+        created_at:
+          type: string
+          format: date-time
+
+    ClientWithInviteToken:
+      allOf:
+        - $ref: "#/components/schemas/Client"
+        - type: object
+          required: [invite_token]
+          properties:
+            invite_token:
+              type: string
+
+    ClientProfile:
+      type: object
+      required: [id, email, first_name, last_name, practitioner]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        date_of_birth:
+          type: [string, "null"]
+          format: date
+        practitioner:
+          type: object
+          required: [id, first_name, last_name]
+          properties:
+            id:
+              type: integer
+            first_name:
+              type: string
+            last_name:
+              type: string
+            practice_name:
+              type: [string, "null"]
+
+    ClientWriteRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        date_of_birth:
+          type: string
+          format: date
+
+    ClientProfileUpdateRequest:
+      $ref: "#/components/schemas/ClientWriteRequest"
+
+    PaginationMeta:
+      type: object
+      required: [page, per_page, total_count, total_pages]
+      properties:
+        page:
+          type: integer
+        per_page:
+          type: integer
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code:
+              type: string
+              examples:
+                - unauthorized
+                - invalid_credentials
+                - validation_failed
+                - invalid_date_filter
+                - invalid_pagination
+                - invalid_refresh_token
+                - invalid_reset_token
+                - invalid_sync_payload
+            message:
+              type: string
+            request_id:
+              type: string
+            details:
+              type: array
+              items:
+                type: string
+            meta:
+              type: object
+              additionalProperties: true
+
+    FoodEntry:
+      type: object
+      required: [id, client_id, consumed_at, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        client_uuid:
+          type: [string, "null"]
+        meal_type:
+          type: [string, "null"]
+          enum: [breakfast, lunch, dinner, snack, null]
+        description:
+          type: [string, "null"]
+        consumed_at:
+          type: string
+          format: date-time
+        notes:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    FoodEntryWriteRequest:
+      type: object
+      properties:
+        meal_type:
+          type: string
+          enum: [breakfast, lunch, dinner, snack]
+        description:
+          type: string
+        consumed_at:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    Symptom:
+      type: object
+      required: [id, client_id, name, occurred_at, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        client_uuid:
+          type: [string, "null"]
+        name:
+          type: string
+        severity:
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 10
+        occurred_at:
+          type: string
+          format: date-time
+        duration_minutes:
+          type: [integer, "null"]
+        notes:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    SymptomWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        severity:
+          type: integer
+          minimum: 1
+          maximum: 10
+        occurred_at:
+          type: string
+          format: date-time
+        duration_minutes:
+          type: integer
+        notes:
+          type: string
+
+    EnergyLog:
+      type: object
+      required: [id, client_id, level, recorded_at, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        client_uuid:
+          type: [string, "null"]
+        level:
+          type: integer
+          minimum: 1
+          maximum: 10
+        recorded_at:
+          type: string
+          format: date-time
+        notes:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    EnergyLogWriteRequest:
+      type: object
+      properties:
+        level:
+          type: integer
+          minimum: 1
+          maximum: 10
+        recorded_at:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    SleepLog:
+      type: object
+      required: [id, client_id, bedtime, wake_time, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        client_uuid:
+          type: [string, "null"]
+        bedtime:
+          type: string
+          format: date-time
+        wake_time:
+          type: string
+          format: date-time
+        quality:
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 10
+        hours_slept:
+          type: [number, string, "null"]
+        notes:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    SleepLogWriteRequest:
+      type: object
+      properties:
+        bedtime:
+          type: string
+          format: date-time
+        wake_time:
+          type: string
+          format: date-time
+        quality:
+          type: integer
+          minimum: 1
+          maximum: 10
+        hours_slept:
+          type: number
+        notes:
+          type: string
+
+    WaterIntake:
+      type: object
+      required: [id, client_id, amount_ml, recorded_at, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        client_uuid:
+          type: [string, "null"]
+        amount_ml:
+          type: integer
+          minimum: 1
+        recorded_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    WaterIntakeWriteRequest:
+      type: object
+      properties:
+        amount_ml:
+          type: integer
+          minimum: 1
+        recorded_at:
+          type: string
+          format: date-time
+
+    Supplement:
+      type: object
+      required: [id, client_id, name, taken_at, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        client_uuid:
+          type: [string, "null"]
+        name:
+          type: string
+        dosage:
+          type: [string, "null"]
+        taken_at:
+          type: string
+          format: date-time
+        notes:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    SupplementWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        dosage:
+          type: string
+        taken_at:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    Consent:
+      type: object
+      required: [id, client_id, consent_type, version, granted_at, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        consent_type:
+          type: string
+        version:
+          type: string
+        granted_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: [string, "null"]
+          format: date-time
+        ip_address:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ClientEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Client"
+    ClientWithInviteEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/ClientWithInviteToken"
+    ClientCollectionEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Client"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+    ClientProfileEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/ClientProfile"
+    ConsentEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Consent"
+    ConsentCollectionEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Consent"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    FoodEntryEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/FoodEntry"
+    FoodEntryCollectionEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FoodEntry"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+    SymptomEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Symptom"
+    SymptomCollectionEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Symptom"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+    EnergyLogEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/EnergyLog"
+    EnergyLogCollectionEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnergyLog"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+    SleepLogEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/SleepLog"
+    SleepLogCollectionEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SleepLog"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+    WaterIntakeEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/WaterIntake"
+    WaterIntakeCollectionEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/WaterIntake"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+    SupplementEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Supplement"
+    SupplementCollectionEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Supplement"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    SyncRequest:
+      type: object
+      required: [operations]
+      properties:
+        operations:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncOperation"
+    SyncOperation:
+      type: object
+      properties:
+        op_id:
+          type: string
+          description: Client-generated operation identifier echoed in the response.
+        resource_type:
+          type: string
+          enum: [food_entries, symptoms, energy_logs, sleep_logs, water_intakes, supplements]
+        type:
+          type: string
+          description: Alias for resource_type.
+        action:
+          type: string
+          enum: [upsert, delete]
+          default: upsert
+        id:
+          type: integer
+          description: Existing server record ID.
+        client_uuid:
+          type: string
+          description: Client-generated stable UUID used for offline retry deduplication.
+        attributes:
+          type: object
+          additionalProperties: true
+    SyncResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncResult"
+        meta:
+          type: object
+          required: [total, synced, skipped, failed]
+          properties:
+            total:
+              type: integer
+            synced:
+              type: integer
+            skipped:
+              type: integer
+            failed:
+              type: integer
+    SyncResult:
+      type: object
+      required: [index, status]
+      properties:
+        op_id:
+          type: [string, "null"]
+        index:
+          type: integer
+        id:
+          type: [integer, "null"]
+        resource_type:
+          type: [string, "null"]
+        client_uuid:
+          type: [string, "null"]
+        status:
+          type: string
+          enum: [synced, deleted, skipped, failed]
+        record:
+          oneOf:
+            - $ref: "#/components/schemas/FoodEntry"
+            - $ref: "#/components/schemas/Symptom"
+            - $ref: "#/components/schemas/EnergyLog"
+            - $ref: "#/components/schemas/SleepLog"
+            - $ref: "#/components/schemas/WaterIntake"
+            - $ref: "#/components/schemas/Supplement"
+            - type: "null"
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: string
+
+    GdprExportResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          properties:
+            profile:
+              type: object
+              additionalProperties: true
+            consents:
+              type: array
+              items:
+                $ref: "#/components/schemas/Consent"
+            food_entries:
+              type: array
+              items:
+                $ref: "#/components/schemas/FoodEntry"
+            symptoms:
+              type: array
+              items:
+                $ref: "#/components/schemas/Symptom"
+            energy_logs:
+              type: array
+              items:
+                $ref: "#/components/schemas/EnergyLog"
+            sleep_logs:
+              type: array
+              items:
+                $ref: "#/components/schemas/SleepLog"
+            water_intakes:
+              type: array
+              items:
+                $ref: "#/components/schemas/WaterIntake"
+            supplements:
+              type: array
+              items:
+                $ref: "#/components/schemas/Supplement"
