@@ -1,10 +1,19 @@
 module Api
   module V1
     module Practitioner
-      class SleepLogsController < BaseController
-        def index
-          logs = filter_by_date_range(@client.sleep_logs, :bedtime).order(bedtime: :desc)
-          render json: logs
+      class SleepLogsController < ResourceIndexesController
+        private
+
+        def resource_scope
+          @client.sleep_logs
+        end
+
+        def serializer_class
+          SleepLogSerializer
+        end
+
+        def timestamp_column
+          :bedtime
         end
       end
     end

@@ -3,4 +3,5 @@ class SleepLog < ApplicationRecord
 
   validates :bedtime, :wake_time, presence: true
   validates :quality, inclusion: { in: 1..10 }, allow_nil: true
+  validates :client_uuid, uniqueness: { scope: :client_id }, allow_nil: true
 end

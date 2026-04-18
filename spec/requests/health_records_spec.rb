@@ -113,7 +113,7 @@ RSpec.describe "Health record endpoints", type: :request do
 
     raise "Failed to create #{resource_name} for test setup" unless session.response.status == 201
 
-    resource_config[:model].find(session.response.parsed_body["id"])
+    resource_config[:model].find(session.response.parsed_body.dig("data", "id"))
   end
 
   shared_examples "client-owned health resource" do |resource_name, resource_config|
@@ -137,7 +137,13 @@ RSpec.describe "Health record endpoints", type: :request do
       get client_collection_path(resource_name), headers: auth_headers_for(owned_client)
 
       expect(response).to have_http_status(:ok)
-      expect(json_response.map { |entry| entry["id"] }).to eq([ record.id ])
+      expect(response_data.map { |entry| entry["id"] }).to eq([ record.id ])
+      expect(response_meta).to include(
+        "page" => 1,
+        "per_page" => 50,
+        "total_count" => 1,
+        "total_pages" => 1
+      )
     end
 
     it "shows the authenticated client's #{resource_name.to_s.singularize}" do
@@ -146,7 +152,7 @@ RSpec.describe "Health record endpoints", type: :request do
       get client_member_path(resource_name, record), headers: auth_headers_for(owned_client)
 
       expect(response).to have_http_status(:ok)
-      expect(json_response["id"]).to eq(record.id)
+      expect(response_data["id"]).to eq(record.id)
     end
 
     it "returns not found for another client's #{resource_name.to_s.singularize}" do
@@ -166,7 +172,7 @@ RSpec.describe "Health record endpoints", type: :request do
       end.to change { resource_config[:model].count }.by(1)
 
       expect(response).to have_http_status(:created)
-      expect(json_response["id"]).to be_present
+      expect(response_data["id"]).to be_present
     end
 
     it "rejects invalid #{resource_name.to_s.singularize} creation" do
@@ -222,7 +228,13 @@ RSpec.describe "Health record endpoints", type: :request do
       get practitioner_collection_path(owned_client, resource_name), headers: auth_headers_for(practitioner)
 
       expect(response).to have_http_status(:ok)
-      expect(json_response.map { |entry| entry["id"] }).to eq([ record.id ])
+      expect(response_data.map { |entry| entry["id"] }).to eq([ record.id ])
+      expect(response_meta).to include(
+        "page" => 1,
+        "per_page" => 50,
+        "total_count" => 1,
+        "total_pages" => 1
+      )
     end
 
     it "returns not found when a practitioner requests an unrelated client's #{resource_name}" do

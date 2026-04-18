@@ -3,18 +3,21 @@ module Api
     module Client
       class ProfileController < BaseController
         def show
-          render json: {
-            id: @current_client.id,
-            email: @current_client.email,
-            first_name: @current_client.first_name,
-            last_name: @current_client.last_name,
-            date_of_birth: @current_client.date_of_birth,
-            practitioner: {
-              first_name: @current_client.practitioner.first_name,
-              last_name: @current_client.practitioner.last_name,
-              practice_name: @current_client.practitioner.practice_name
-            }
-          }
+          render_resource(@current_client, serializer: ClientProfileSerializer)
+        end
+
+        def update
+          if @current_client.update(profile_params)
+            render_resource(@current_client, serializer: ClientProfileSerializer)
+          else
+            render_validation_errors(@current_client)
+          end
+        end
+
+        private
+
+        def profile_params
+          params.permit(:email, :first_name, :last_name, :date_of_birth)
         end
       end
     end

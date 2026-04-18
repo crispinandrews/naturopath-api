@@ -1,6 +1,7 @@
 class Client < ApplicationRecord
   INVITE_TTL = 14.days
   ExpiredInviteError = Class.new(StandardError)
+  InviteAlreadyAcceptedError = Class.new(StandardError)
 
   has_secure_password validations: false
 
@@ -12,6 +13,8 @@ class Client < ApplicationRecord
   has_many :water_intakes, dependent: :destroy
   has_many :supplements, dependent: :destroy
   has_many :consents, dependent: :destroy
+  has_many :refresh_tokens, dependent: :destroy
+  has_many :password_reset_tokens, dependent: :destroy
 
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
@@ -44,6 +47,15 @@ class Client < ApplicationRecord
       invite_accepted_at: Time.current,
       invite_token: nil,
       invite_expires_at: nil
+    )
+  end
+
+  def refresh_invite!
+    raise InviteAlreadyAcceptedError if invite_accepted_at.present?
+
+    update!(
+      invite_token: SecureRandom.urlsafe_base64(32),
+      invite_expires_at: INVITE_TTL.from_now
     )
   end
 

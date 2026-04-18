@@ -1,7 +1,9 @@
 class ApplicationController < ActionController::API
   class InvalidDateFilterError < StandardError; end
+  class InvalidPaginationError < StandardError; end
 
   rescue_from InvalidDateFilterError, with: :render_invalid_date_filter
+  rescue_from InvalidPaginationError, with: :render_invalid_pagination
   rescue_from ActionController::ParameterMissing, with: :render_parameter_missing
   rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
   rescue_from StandardError, with: :render_internal_server_error unless Rails.env.development? || Rails.env.test?
@@ -66,6 +68,14 @@ class ApplicationController < ActionController::API
     )
   end
 
+  def render_invalid_pagination(error)
+    render_error(
+      code: "invalid_pagination",
+      message: error.message,
+      status: :unprocessable_entity
+    )
+  end
+
   def render_parameter_missing(error)
     render_error(
       code: "parameter_missing",
@@ -91,6 +101,20 @@ class ApplicationController < ActionController::API
       details: details,
       meta: meta
     ), status: status
+  end
+
+  def render_resource(record, serializer:, status: :ok, meta: nil)
+    render json: {
+      data: serializer.as_json(record),
+      meta: meta
+    }.compact, status: status
+  end
+
+  def render_collection(records, serializer:, meta: {})
+    render json: {
+      data: serializer.collection(records),
+      meta: meta
+    }, status: :ok
   end
 
   def request_context(extra_context = {})

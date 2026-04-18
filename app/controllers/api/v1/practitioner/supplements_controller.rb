@@ -1,10 +1,19 @@
 module Api
   module V1
     module Practitioner
-      class SupplementsController < BaseController
-        def index
-          supplements = filter_by_date_range(@client.supplements, :taken_at).order(taken_at: :desc)
-          render json: supplements
+      class SupplementsController < ResourceIndexesController
+        private
+
+        def resource_scope
+          @client.supplements
+        end
+
+        def serializer_class
+          SupplementSerializer
+        end
+
+        def timestamp_column
+          :taken_at
         end
       end
     end

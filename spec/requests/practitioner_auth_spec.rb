@@ -1,38 +1,6 @@
 require "rails_helper"
 
 RSpec.describe "Practitioner authentication", type: :request do
-  it "registers a practitioner" do
-    post "/api/v1/practitioner/register",
-      params: {
-        email: unique_email("registered-practitioner"),
-        password: "password123",
-        password_confirmation: "password123",
-        first_name: "Robin",
-        last_name: "Stone",
-        practice_name: "Stone Wellness"
-      },
-      as: :json
-
-    expect(response).to have_http_status(:created)
-    expect(json_response["token"]).to be_present
-    expect(json_response["practitioner"]["practice_name"]).to eq("Stone Wellness")
-  end
-
-  it "rejects invalid registration params" do
-    post "/api/v1/practitioner/register",
-      params: {
-        email: "not-an-email",
-        password: "short",
-        password_confirmation: "mismatch",
-        first_name: "",
-        last_name: ""
-      },
-      as: :json
-
-    expect_error_response(status: 422, code: "validation_failed", message: "Validation failed")
-    expect(json_response.dig("error", "details")).not_to be_empty
-  end
-
   it "logs in an existing practitioner" do
     practitioner = create_practitioner(password: "password123")
 

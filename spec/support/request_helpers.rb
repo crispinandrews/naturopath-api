@@ -38,6 +38,14 @@ module RequestHelpers
     response.parsed_body
   end
 
+  def response_data
+    json_response.fetch("data")
+  end
+
+  def response_meta
+    json_response.fetch("meta")
+  end
+
   def expect_error_response(status:, code:, message:)
     expect(response).to have_http_status(status)
     expect(json_response.dig("error", "code")).to eq(code)

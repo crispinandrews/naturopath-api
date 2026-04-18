@@ -1,4 +1,8 @@
 class PractitionerSerializer
+  def self.collection(records)
+    records.map { |record| as_json(record) }
+  end
+
   def self.as_json(practitioner)
     {
       id: practitioner.id,

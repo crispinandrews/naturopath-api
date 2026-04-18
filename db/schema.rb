@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_06_170000) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_12_101000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -52,6 +52,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_06_170000) do
     t.text "notes"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "client_uuid"
+    t.index ["client_id", "client_uuid"], name: "index_energy_logs_on_client_id_and_client_uuid", unique: true, where: "(client_uuid IS NOT NULL)"
     t.index ["client_id", "recorded_at"], name: "index_energy_logs_on_client_id_and_recorded_at"
     t.index ["client_id"], name: "index_energy_logs_on_client_id"
   end
@@ -64,8 +66,22 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_06_170000) do
     t.text "notes"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "client_uuid"
+    t.index ["client_id", "client_uuid"], name: "index_food_entries_on_client_id_and_client_uuid", unique: true, where: "(client_uuid IS NOT NULL)"
     t.index ["client_id", "consumed_at"], name: "index_food_entries_on_client_id_and_consumed_at"
     t.index ["client_id"], name: "index_food_entries_on_client_id"
+  end
+
+  create_table "password_reset_tokens", force: :cascade do |t|
+    t.bigint "client_id", null: false
+    t.string "token_digest", null: false
+    t.datetime "expires_at", null: false
+    t.datetime "used_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["client_id"], name: "index_password_reset_tokens_on_client_id"
+    t.index ["expires_at"], name: "index_password_reset_tokens_on_expires_at"
+    t.index ["token_digest"], name: "index_password_reset_tokens_on_token_digest", unique: true
   end
 
   create_table "practitioners", force: :cascade do |t|
@@ -79,6 +95,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_06_170000) do
     t.index ["email"], name: "index_practitioners_on_email", unique: true
   end
 
+  create_table "refresh_tokens", force: :cascade do |t|
+    t.bigint "client_id", null: false
+    t.string "token_digest", null: false
+    t.datetime "expires_at", null: false
+    t.datetime "revoked_at"
+    t.datetime "last_used_at"
+    t.bigint "replaced_by_token_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["client_id"], name: "index_refresh_tokens_on_client_id"
+    t.index ["expires_at"], name: "index_refresh_tokens_on_expires_at"
+    t.index ["replaced_by_token_id"], name: "index_refresh_tokens_on_replaced_by_token_id"
+    t.index ["token_digest"], name: "index_refresh_tokens_on_token_digest", unique: true
+  end
+
   create_table "sleep_logs", force: :cascade do |t|
     t.bigint "client_id", null: false
     t.datetime "bedtime", null: false
@@ -88,7 +119,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_06_170000) do
     t.text "notes"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "client_uuid"
     t.index ["client_id", "bedtime"], name: "index_sleep_logs_on_client_id_and_bedtime"
+    t.index ["client_id", "client_uuid"], name: "index_sleep_logs_on_client_id_and_client_uuid", unique: true, where: "(client_uuid IS NOT NULL)"
     t.index ["client_id"], name: "index_sleep_logs_on_client_id"
   end
 
@@ -100,6 +133,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_06_170000) do
     t.text "notes"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "client_uuid"
+    t.index ["client_id", "client_uuid"], name: "index_supplements_on_client_id_and_client_uuid", unique: true, where: "(client_uuid IS NOT NULL)"
     t.index ["client_id", "taken_at"], name: "index_supplements_on_client_id_and_taken_at"
     t.index ["client_id"], name: "index_supplements_on_client_id"
   end
@@ -113,6 +148,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_06_170000) do
     t.text "notes"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "client_uuid"
+    t.index ["client_id", "client_uuid"], name: "index_symptoms_on_client_id_and_client_uuid", unique: true, where: "(client_uuid IS NOT NULL)"
     t.index ["client_id", "occurred_at"], name: "index_symptoms_on_client_id_and_occurred_at"
     t.index ["client_id"], name: "index_symptoms_on_client_id"
   end
@@ -123,6 +160,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_06_170000) do
     t.datetime "recorded_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "client_uuid"
+    t.index ["client_id", "client_uuid"], name: "index_water_intakes_on_client_id_and_client_uuid", unique: true, where: "(client_uuid IS NOT NULL)"
     t.index ["client_id", "recorded_at"], name: "index_water_intakes_on_client_id_and_recorded_at"
     t.index ["client_id"], name: "index_water_intakes_on_client_id"
   end
@@ -131,6 +170,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_06_170000) do
   add_foreign_key "consents", "clients"
   add_foreign_key "energy_logs", "clients"
   add_foreign_key "food_entries", "clients"
+  add_foreign_key "password_reset_tokens", "clients"
+  add_foreign_key "refresh_tokens", "clients"
+  add_foreign_key "refresh_tokens", "refresh_tokens", column: "replaced_by_token_id"
   add_foreign_key "sleep_logs", "clients"
   add_foreign_key "supplements", "clients"
   add_foreign_key "symptoms", "clients"

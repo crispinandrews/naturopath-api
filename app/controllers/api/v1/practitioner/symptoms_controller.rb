@@ -1,10 +1,19 @@
 module Api
   module V1
     module Practitioner
-      class SymptomsController < BaseController
-        def index
-          symptoms = filter_by_date_range(@client.symptoms, :occurred_at).order(occurred_at: :desc)
-          render json: symptoms
+      class SymptomsController < ResourceIndexesController
+        private
+
+        def resource_scope
+          @client.symptoms
+        end
+
+        def serializer_class
+          SymptomSerializer
+        end
+
+        def timestamp_column
+          :occurred_at
         end
       end
     end

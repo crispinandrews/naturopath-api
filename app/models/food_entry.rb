@@ -3,4 +3,5 @@ class FoodEntry < ApplicationRecord
 
   validates :consumed_at, presence: true
   validates :meal_type, inclusion: { in: %w[breakfast lunch dinner snack] }, allow_nil: true
+  validates :client_uuid, uniqueness: { scope: :client_id }, allow_nil: true
 end

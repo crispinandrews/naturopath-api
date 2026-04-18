@@ -64,17 +64,34 @@ Rails.application.configure do
   config.action_controller.perform_caching = true
   config.cache_store = :memory_store, { size: 64.megabytes }
 
-  # Use a real queuing backend for Active Job (and separate queues per environment).
-  # config.active_job.queue_adapter = :resque
-  # config.active_job.queue_name_prefix = "naturopath_api_production"
+  # Use an ENV-selected queue backend so hosted environments can switch to a
+  # durable adapter without code changes.
+  config.active_job.queue_adapter = ENV.fetch("ACTIVE_JOB_QUEUE_ADAPTER", "async").to_sym
+  config.active_job.queue_name_prefix = "naturopath_api_production"
 
   # Disable caching for Action Mailer templates even if Action Controller
   # caching is enabled.
   config.action_mailer.perform_caching = false
 
-  # Ignore bad email addresses and do not raise email delivery errors.
-  # Set this to true and configure the email server for immediate delivery to raise delivery errors.
-  # config.action_mailer.raise_delivery_errors = false
+  config.action_mailer.perform_deliveries = true
+  config.action_mailer.raise_delivery_errors = ENV.fetch("MAILER_RAISE_DELIVERY_ERRORS", "true") == "true"
+  config.action_mailer.default_url_options = {
+    host: ENV.fetch("MAILER_HOST", ENV.fetch("APP_HOST", "example.com")),
+    protocol: ENV.fetch("MAILER_PROTOCOL", "https")
+  }
+
+  if ENV["SMTP_ADDRESS"].present?
+    config.action_mailer.delivery_method = :smtp
+    config.action_mailer.smtp_settings = {
+      address: ENV.fetch("SMTP_ADDRESS"),
+      port: ENV.fetch("SMTP_PORT", 587).to_i,
+      domain: ENV.fetch("SMTP_DOMAIN", ENV.fetch("MAILER_HOST", "naturopath.local")),
+      user_name: ENV["SMTP_USERNAME"],
+      password: ENV["SMTP_PASSWORD"],
+      authentication: ENV.fetch("SMTP_AUTHENTICATION", "plain").to_sym,
+      enable_starttls_auto: ENV.fetch("SMTP_ENABLE_STARTTLS_AUTO", "true") == "true"
+    }.compact
+  end
 
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   # the I18n.default_locale when a translation cannot be found).

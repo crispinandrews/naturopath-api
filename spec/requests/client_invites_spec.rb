@@ -14,6 +14,7 @@ RSpec.describe "Client invites", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(json_response["token"]).to be_present
+    expect(json_response["refresh_token"]).to be_present
     expect(json_response["client"]["id"]).to eq(client.id)
     expect(client.reload.invite_accepted_at).to be_present
     expect(client.invite_token).to be_nil
@@ -28,6 +29,7 @@ RSpec.describe "Client invites", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(json_response["token"]).to be_present
+    expect(json_response["refresh_token"]).to be_present
     expect(json_response["client"]["id"]).to eq(client.id)
   end
 

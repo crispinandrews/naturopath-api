@@ -1,10 +1,19 @@
 module Api
   module V1
     module Practitioner
-      class WaterIntakesController < BaseController
-        def index
-          intakes = filter_by_date_range(@client.water_intakes, :recorded_at).order(recorded_at: :desc)
-          render json: intakes
+      class WaterIntakesController < ResourceIndexesController
+        private
+
+        def resource_scope
+          @client.water_intakes
+        end
+
+        def serializer_class
+          WaterIntakeSerializer
+        end
+
+        def timestamp_column
+          :recorded_at
         end
       end
     end

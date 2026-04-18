@@ -22,25 +22,7 @@ module Api
         end
       end
 
-      def register
-        practitioner = ::Practitioner.new(practitioner_params)
-
-        if practitioner.save
-          token = JwtService.encode({ user_id: practitioner.id, user_type: "Practitioner" })
-          render json: {
-            token: token,
-            practitioner: PractitionerSerializer.as_json(practitioner)
-          }, status: :created
-        else
-          render_validation_errors(practitioner)
-        end
-      end
-
       private
-
-      def practitioner_params
-        params.permit(:email, :password, :password_confirmation, :first_name, :last_name, :practice_name)
-      end
     end
   end
 end

@@ -4,15 +4,20 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       # Practitioner auth
-      post "practitioner/register", to: "practitioner_auth#register"
       post "practitioner/login", to: "practitioner_auth#login"
 
       # Client auth
       post "client/login", to: "client_auth#login"
       post "client/accept_invite", to: "client_auth#accept_invite"
+      post "client/forgot_password", to: "client_auth#forgot_password"
+      post "client/reset_password", to: "client_auth#reset_password"
+      post "client/refresh", to: "client_auth#refresh"
+      post "client/logout", to: "client_auth#logout"
 
       # Practitioner-facing: manage clients
-      resources :clients, only: [ :index, :show, :create, :update, :destroy ]
+      resources :clients, only: [ :index, :show, :create, :update, :destroy ] do
+        post :resend_invite, on: :member
+      end
 
       # Practitioner-facing: view client entries
       resources :clients, only: [] do
@@ -34,6 +39,9 @@ Rails.application.routes.draw do
         resources :supplements, only: [ :index, :show, :create, :update, :destroy ]
         resources :consents, only: [ :index, :create ]
         get "profile", to: "profile#show"
+        patch "profile", to: "profile#update"
+        patch "password", to: "password#update"
+        post "sync", to: "sync#create"
       end
 
       # GDPR

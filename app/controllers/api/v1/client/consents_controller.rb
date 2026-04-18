@@ -4,7 +4,8 @@ module Api
       class ConsentsController < BaseController
         def index
           consents = @current_client.consents.order(created_at: :desc)
-          render json: consents
+          records, meta = paginate(consents)
+          render_collection(records, serializer: ConsentSerializer, meta: meta)
         end
 
         def create
@@ -13,7 +14,7 @@ module Api
           consent.ip_address = request.remote_ip
 
           if consent.save
-            render json: consent, status: :created
+            render_resource(consent, serializer: ConsentSerializer, status: :created)
           else
             render_validation_errors(consent)
           end

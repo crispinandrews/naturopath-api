@@ -57,16 +57,19 @@ bin/ci
 
 ## API Endpoints
 
-All endpoints are under `/api/v1/`.
+All endpoints are under `/api/v1/`. The canonical API contract is now maintained in [docs/openapi.yaml](docs/openapi.yaml). Use that OpenAPI spec as the integration source of truth for the dashboard, iOS app, and Android app.
 
 ### Authentication
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/practitioner/register` | Register a new practitioner |
 | POST | `/practitioner/login` | Practitioner login |
 | POST | `/client/login` | Client login |
 | POST | `/client/accept_invite` | Accept invite and set password |
+| POST | `/client/forgot_password` | Request password reset email |
+| POST | `/client/reset_password` | Reset password with token |
+| POST | `/client/refresh` | Rotate refresh token and issue a new access token |
+| POST | `/client/logout` | Revoke a refresh token |
 
 All authenticated endpoints require a JWT token in the `Authorization: Bearer <token>` header.
 
@@ -77,6 +80,8 @@ Authentication hardening currently includes:
 - Rate limiting on practitioner login, client login, and invite acceptance
 - JWT issuer, audience, issued-at, and key ID claims
 - Support for one previous JWT signing secret during key rotation
+- Client refresh tokens with rotation and logout revocation
+- Client password reset tokens delivered by email
 
 ### Practitioner Endpoints
 
@@ -89,6 +94,7 @@ Require practitioner authentication.
 | GET | `/clients/:id` | View client details |
 | PATCH | `/clients/:id` | Update client |
 | DELETE | `/clients/:id` | Delete client |
+| POST | `/clients/:id/resend_invite` | Rotate invite token and extend invite expiry |
 | GET | `/clients/:id/food_entries` | View client's food entries |
 | GET | `/clients/:id/symptoms` | View client's symptoms |
 | GET | `/clients/:id/energy_logs` | View client's energy logs |
@@ -103,6 +109,9 @@ Require client authentication. All data is scoped to the authenticated client.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/client/profile` | View own profile |
+| PATCH | `/client/profile` | Update own profile |
+| PATCH | `/client/password` | Change own password |
+| POST | `/client/sync` | Sync queued offline health-record operations |
 | GET/POST/PATCH/DELETE | `/client/food_entries` | Manage food entries |
 | GET/POST/PATCH/DELETE | `/client/symptoms` | Manage symptoms |
 | GET/POST/PATCH/DELETE | `/client/energy_logs` | Manage energy logs |
@@ -130,6 +139,12 @@ GET /api/v1/client/food_entries?from=2026-04-01&to=2026-04-07
 
 Date-only filters are interpreted in the app time zone. `from` uses the start of the day, `to` uses the end of the day, and invalid date filters return `422 Unprocessable Entity`.
 
+List endpoints are paginated with `page` and `per_page` query parameters. Defaults are `page=1` and `per_page=50`, with a maximum `per_page` of `100`.
+
+```http
+GET /api/v1/client/food_entries?page=2&per_page=25
+```
+
 ### Error Responses
 
 Errors use a consistent envelope:
@@ -153,10 +168,55 @@ Common error codes:
 - `invalid_credentials`
 - `invite_not_found`
 - `invite_expired`
+- `invite_already_accepted`
 - `validation_failed`
 - `invalid_date_filter`
+- `invalid_pagination`
 - `rate_limited`
 - `internal_server_error`
+
+### Success Response Envelopes
+
+Resource endpoints now use explicit envelopes:
+
+```json
+{
+  "data": {
+    "id": 123
+  }
+}
+```
+
+List endpoints include pagination metadata:
+
+```json
+{
+  "data": [],
+  "meta": {
+    "page": 1,
+    "per_page": 50,
+    "total_count": 0,
+    "total_pages": 0
+  }
+}
+```
+
+Authentication endpoints remain unwrapped and continue returning `token` plus the authenticated user payload.
+
+Client authentication endpoints return both an access `token` and a `refresh_token`. Refresh tokens currently expire after 30 days and rotate on `/client/refresh`. JWT access tokens currently expire after 24 hours.
+
+### OpenAPI Contract
+
+The OpenAPI document at [docs/openapi.yaml](docs/openapi.yaml) covers the current implemented API surface:
+
+- auth, invite acceptance, refresh/logout, and password reset
+- practitioner client management and invite resend
+- client profile, password, consents, health-record CRUD, and sync
+- practitioner read-only client health-record views
+- pagination, date filtering, response envelopes, and error envelopes
+- GDPR export/delete
+
+When frontend consumers need request/response fields, prefer the OpenAPI schemas over the README summaries.
 
 ## Data Model
 
@@ -193,8 +253,20 @@ Required or recommended environment variables:
 | `JWT_PREVIOUS_KEY_VERSION` | No | Previous JWT key ID. Defaults to `previous` |
 | `JWT_ISSUER` | No | JWT issuer claim. Defaults to `naturopath-api` |
 | `JWT_AUDIENCE` | No | JWT audience claim. Defaults to `naturopath-api-clients` |
+| `REFRESH_TOKEN_SECRET` | Recommended | Secret used to digest refresh tokens. Falls back to Rails secret outside production-specific hardening. |
+| `PASSWORD_RESET_TOKEN_SECRET` | Recommended | Secret used to digest password reset tokens. Falls back to Rails secret outside production-specific hardening. |
 | `APP_TIME_ZONE` | No | Date-filter time zone. Defaults to `UTC` |
 | `RAILS_LOG_LEVEL` | No | Structured application log verbosity |
+| `CORS_ORIGINS` | Recommended | Allowed browser origins for the dashboard. Defaults to local development origin. |
+| `MAILER_FROM` | Recommended | Default sender address for invite and password reset emails |
+| `APP_HOST` / `MAILER_HOST` | Recommended | Host used for generated email links |
+| `SMTP_ADDRESS` | Recommended for email | SMTP host. If absent, production mail delivery is not SMTP-backed. |
+| `SMTP_PORT` | No | SMTP port. Defaults to `587` |
+| `SMTP_DOMAIN` | No | SMTP HELO/domain value |
+| `SMTP_USERNAME` | Depends on SMTP provider | SMTP username |
+| `SMTP_PASSWORD` | Depends on SMTP provider | SMTP password |
+| `SMTP_AUTHENTICATION` | No | SMTP auth mode. Defaults to `plain` |
+| `SMTP_ENABLE_STARTTLS_AUTO` | No | Enables SMTP STARTTLS. Defaults to `true` |
 
 Notes:
 
