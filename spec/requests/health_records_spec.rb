@@ -138,6 +138,7 @@ RSpec.describe "Health record endpoints", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response_data.map { |entry| entry["id"] }).to eq([ record.id ])
+      expect(response_data.first).not_to have_key("client_id")
       expect(response_meta).to include(
         "page" => 1,
         "per_page" => 50,
@@ -229,6 +230,7 @@ RSpec.describe "Health record endpoints", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response_data.map { |entry| entry["id"] }).to eq([ record.id ])
+      expect(response_data.first["client_id"]).to eq(owned_client.id)
       expect(response_meta).to include(
         "page" => 1,
         "per_page" => 50,

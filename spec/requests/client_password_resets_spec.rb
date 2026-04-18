@@ -147,4 +147,18 @@ RSpec.describe "Client password reset", type: :request do
     expect_error_response(status: :unprocessable_entity, code: "validation_failed", message: "Validation failed")
     expect(client.reload.authenticate("oldpassword123")).to be_truthy
   end
+
+  it "rate limits repeated authenticated password change attempts" do
+    6.times do
+      patch "/api/v1/client/password",
+        params: {
+          current_password: "wrongpassword123",
+          new_password: "changedpassword123"
+        },
+        headers: auth_headers_for(client),
+        as: :json
+    end
+
+    expect_error_response(status: :too_many_requests, code: "rate_limited", message: "Too many requests. Try again later.")
+  end
 end

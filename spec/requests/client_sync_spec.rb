@@ -42,7 +42,7 @@ RSpec.describe "Client sync", type: :request do
       as: :json
 
     expect(response).to have_http_status(:ok)
-    expect(response_meta).to include("total" => 2, "synced" => 1, "skipped" => 0, "failed" => 1)
+    expect(response_meta).to include("total" => 2, "upserted" => 1, "deleted" => 0, "skipped" => 0, "failed" => 1)
     expect(response_data.first).to include(
       "op_id" => "food-1",
       "id" => client.food_entries.first.id,
@@ -52,6 +52,7 @@ RSpec.describe "Client sync", type: :request do
     )
     expect(response_data.first.dig("record", "id")).to be_present
     expect(response_data.first.dig("record", "client_uuid")).to eq("food-local-1")
+    expect(response_data.first["record"]).not_to have_key("client_id")
     expect(response_data.second).to include("status" => "failed")
     expect(response_data.second.dig("error", "code")).to eq("validation_failed")
     expect(client.food_entries.count).to eq(1)
@@ -140,6 +141,7 @@ RSpec.describe "Client sync", type: :request do
       as: :json
 
     expect(response).to have_http_status(:ok)
+    expect(response_meta).to include("total" => 1, "upserted" => 0, "deleted" => 1, "skipped" => 0, "failed" => 0)
     expect(response_data.first).to include("status" => "deleted")
     expect(response_data.first["id"]).to eq(supplement.id)
     expect(client.supplements.exists?(supplement.id)).to be(false)
@@ -161,7 +163,7 @@ RSpec.describe "Client sync", type: :request do
       as: :json
 
     expect(response).to have_http_status(:ok)
-    expect(response_meta).to include("total" => 1, "synced" => 0, "skipped" => 1, "failed" => 0)
+    expect(response_meta).to include("total" => 1, "upserted" => 0, "deleted" => 0, "skipped" => 1, "failed" => 0)
     expect(response_data.first).to include(
       "op_id" => "supplement-delete-2",
       "id" => nil,

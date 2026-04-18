@@ -5,6 +5,12 @@ module Api
         include TimestampFilterable
 
         before_action :authenticate_client!
+
+        private
+
+        def serializer_context
+          :client
+        end
       end
     end
   end

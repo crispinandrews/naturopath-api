@@ -47,4 +47,44 @@ RSpec.describe "Serializer contracts" do
 
     expect(ClientProfileSerializer.collection([ client ])).to eq([ ClientProfileSerializer.as_json(client) ])
   end
+
+  it "includes client_id in health record serializers by default" do
+    practitioner = create_practitioner
+    client = create_client(practitioner: practitioner)
+    food_entry = client.food_entries.create!(
+      meal_type: "lunch",
+      description: "Salad",
+      consumed_at: Time.zone.parse("2026-04-05 12:00:00")
+    )
+
+    serialized = FoodEntrySerializer.as_json(food_entry)
+
+    expect(serialized).to have_key(:client_id)
+    expect(serialized[:client_id]).to eq(client.id)
+  end
+
+  it "omits client_id from health record serializers with client context" do
+    practitioner = create_practitioner
+    client = create_client(practitioner: practitioner)
+    food_entry = client.food_entries.create!(
+      meal_type: "lunch",
+      description: "Salad",
+      consumed_at: Time.zone.parse("2026-04-05 12:00:00")
+    )
+
+    serialized = FoodEntrySerializer.as_json(food_entry, context: :client)
+
+    expect(serialized).not_to have_key(:client_id)
+    expect(serialized[:id]).to eq(food_entry.id)
+  end
+
+  it "omits client_id from collection serialization with client context" do
+    practitioner = create_practitioner
+    client = create_client(practitioner: practitioner)
+    client.energy_logs.create!(level: 5, recorded_at: Time.zone.parse("2026-04-05 10:00:00"))
+
+    collection = EnergyLogSerializer.collection(client.energy_logs, context: :client)
+
+    expect(collection.first).not_to have_key(:client_id)
+  end
 end

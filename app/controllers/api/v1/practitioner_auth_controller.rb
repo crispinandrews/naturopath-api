@@ -21,8 +21,6 @@ module Api
           render_error(code: "invalid_credentials", message: "Invalid email or password", status: :unauthorized)
         end
       end
-
-      private
     end
   end
 end

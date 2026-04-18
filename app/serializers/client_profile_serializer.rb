@@ -1,9 +1,9 @@
 class ClientProfileSerializer
-  def self.collection(records)
-    records.map { |record| as_json(record) }
+  def self.collection(records, context: nil)
+    records.map { |record| as_json(record, context: context) }
   end
 
-  def self.as_json(client)
+  def self.as_json(client, context: nil)
     {
       id: client.id,
       email: client.email,

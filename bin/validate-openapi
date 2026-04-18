@@ -1,0 +1,49 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "yaml"
+
+SPEC_PATH = File.expand_path("../docs/openapi.yaml", __dir__)
+
+abort "OpenAPI spec not found at #{SPEC_PATH}" unless File.file?(SPEC_PATH)
+
+document = YAML.load_file(SPEC_PATH)
+abort "OpenAPI spec must parse to a YAML mapping" unless document.is_a?(Hash)
+
+refs = []
+
+walk = lambda do |value|
+  case value
+  when Hash
+    value.each do |key, child|
+      refs << child if key.to_s == %q($ref)
+      walk.call(child)
+    end
+  when Array
+    value.each { |child| walk.call(child) }
+  end
+end
+
+walk.call(document)
+
+resolve_ref = lambda do |ref|
+  return true unless ref.start_with?("#/")
+
+  ref.delete_prefix("#/").split("/").reduce(document) do |current, segment|
+    return false unless current.is_a?(Hash) && current.key?(segment)
+
+    current.fetch(segment)
+  end
+
+  true
+end
+
+missing_refs = refs.uniq.reject { |ref| resolve_ref.call(ref) }
+
+if missing_refs.any?
+  warn "OpenAPI spec has unresolved refs:"
+  missing_refs.each { |ref| warn "  - #{ref}" }
+  exit 1
+end
+
+puts "OpenAPI spec OK: #{refs.uniq.size} refs resolved"

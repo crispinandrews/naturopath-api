@@ -4,13 +4,12 @@ REST API backend for the NaturoPath health tracking platform. Built with Rails 7
 
 ## Overview
 
-NaturoPath is a health data tracking platform for naturopathy practitioners. Clients use native mobile apps (iOS/Android) to log daily health data such as food intake, symptoms, energy levels, sleep, water intake, and supplements. Practitioners access a web dashboard to review client data during consultations.
+NaturoPath is a health data tracking platform for naturopathy practitioners. Clients use a React Native/Expo mobile app for iOS and Android to log daily health data such as food intake, symptoms, energy levels, sleep, water intake, and supplements. Practitioners access a web dashboard to review client data during consultations.
 
-This API serves all three frontends:
+This API serves both product clients:
 
 - **naturopath-dashboard** — Next.js web app for the practitioner
-- **naturopath-ios** — Swift/SwiftUI iOS app for clients
-- **naturopath-android** — Kotlin/Jetpack Compose Android app for clients
+- **naturopath-mobile** — React Native/Expo app for clients on iOS and Android
 
 ## Tech Stack
 
@@ -57,7 +56,7 @@ bin/ci
 
 ## API Endpoints
 
-All endpoints are under `/api/v1/`. The canonical API contract is now maintained in [docs/openapi.yaml](docs/openapi.yaml). Use that OpenAPI spec as the integration source of truth for the dashboard, iOS app, and Android app.
+All endpoints are under `/api/v1/`. The canonical API contract is now maintained in [docs/openapi.yaml](docs/openapi.yaml). Use that OpenAPI spec as the integration source of truth for the dashboard and mobile app.
 
 ### Authentication
 
@@ -205,6 +204,8 @@ Authentication endpoints remain unwrapped and continue returning `token` plus th
 
 Client authentication endpoints return both an access `token` and a `refresh_token`. Refresh tokens currently expire after 30 days and rotate on `/client/refresh`. JWT access tokens currently expire after 24 hours.
 
+Client sync responses return per-operation statuses plus aggregate metadata: `total`, `upserted`, `deleted`, `skipped`, and `failed`. Per-operation statuses remain `synced`, `deleted`, `skipped`, and `failed`.
+
 ### OpenAPI Contract
 
 The OpenAPI document at [docs/openapi.yaml](docs/openapi.yaml) covers the current implemented API surface:
@@ -246,7 +247,8 @@ Required or recommended environment variables:
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `DATABASE_URL` | Yes | Primary PostgreSQL connection |
-| `RAILS_MASTER_KEY` | Yes if credentials are used | Decrypt Rails credentials |
+| `RAILS_MASTER_KEY` | Yes | Decrypt Rails credentials; required by production boot |
+| `APP_HOSTS` | Yes | Comma-separated hosts allowed by Rails host authorization, e.g. `api.example.com,naturopath-api.onrender.com` |
 | `JWT_SECRET_KEY` | Yes | Current JWT signing secret |
 | `JWT_PREVIOUS_SECRET_KEY` | No | Previous JWT secret accepted during rotation |
 | `JWT_KEY_VERSION` | No | Current JWT key ID. Defaults to `current` |
@@ -257,7 +259,7 @@ Required or recommended environment variables:
 | `PASSWORD_RESET_TOKEN_SECRET` | Recommended | Secret used to digest password reset tokens. Falls back to Rails secret outside production-specific hardening. |
 | `APP_TIME_ZONE` | No | Date-filter time zone. Defaults to `UTC` |
 | `RAILS_LOG_LEVEL` | No | Structured application log verbosity |
-| `CORS_ORIGINS` | Recommended | Allowed browser origins for the dashboard. Defaults to local development origin. |
+| `CORS_ORIGINS` | Recommended | Comma-separated allowed browser origins for the dashboard and local development. Defaults to local development origin. |
 | `MAILER_FROM` | Recommended | Default sender address for invite and password reset emails |
 | `APP_HOST` / `MAILER_HOST` | Recommended | Host used for generated email links |
 | `SMTP_ADDRESS` | Recommended for email | SMTP host. If absent, production mail delivery is not SMTP-backed. |
@@ -271,7 +273,7 @@ Required or recommended environment variables:
 Notes:
 
 - Production requires `JWT_SECRET_KEY`; it does not fall back to `secret_key_base`.
-- The app currently uses in-process memory cache in production for rate limiting. That is acceptable on a single node, but move to a shared cache before scaling horizontally.
+- Production currently uses in-process memory cache for rate limiting. This is acceptable for a single app instance, but counters are not shared across processes or nodes. Move to Redis or Solid Cache before scaling horizontally.
 
 ## Operations Runbook
 

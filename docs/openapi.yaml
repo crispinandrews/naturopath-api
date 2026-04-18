@@ -1915,12 +1915,16 @@ components:
             $ref: "#/components/schemas/SyncResult"
         meta:
           type: object
-          required: [total, synced, skipped, failed]
+          required: [total, upserted, deleted, skipped, failed]
           properties:
             total:
               type: integer
-            synced:
+            upserted:
               type: integer
+              description: Number of operations that created or updated a record.
+            deleted:
+              type: integer
+              description: Number of operations that deleted a record.
             skipped:
               type: integer
             failed:

@@ -49,7 +49,8 @@ module Api
             data: results,
             meta: {
               total: results.size,
-              synced: synced_count(results),
+              upserted: upserted_count(results),
+              deleted: deleted_count(results),
               skipped: skipped_count(results),
               failed: failed_count(results)
             }
@@ -86,7 +87,7 @@ module Api
           record.assign_attributes(resource_attributes(operation, config))
 
           if record.save
-            success_result(operation, index, "synced", config[:serializer].as_json(record))
+            success_result(operation, index, "synced", config[:serializer].as_json(record, context: :client))
           else
             failure_result(operation, index, "validation_failed", "Validation failed", record.errors.full_messages)
           end
@@ -96,7 +97,7 @@ module Api
           record = find_existing_record(operation, config)
           return success_result(operation, index, "skipped", nil) if record.nil?
 
-          serialized_record = record ? config[:serializer].as_json(record) : nil
+          serialized_record = config[:serializer].as_json(record, context: :client)
           record.destroy!
 
           success_result(operation, index, "deleted", serialized_record)
@@ -171,8 +172,12 @@ module Api
           }
         end
 
-        def synced_count(results)
-          results.count { |result| %w[synced deleted].include?(result[:status]) }
+        def upserted_count(results)
+          results.count { |result| result[:status] == "synced" }
+        end
+
+        def deleted_count(results)
+          results.count { |result| result[:status] == "deleted" }
         end
 
         def skipped_count(results)

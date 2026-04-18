@@ -71,6 +71,7 @@ RSpec.describe "Client profile and consents", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response_data.length).to eq(1)
+    expect(response_data.first).not_to have_key("client_id")
     expect(response_meta).to include(
       "page" => 1,
       "per_page" => 1,

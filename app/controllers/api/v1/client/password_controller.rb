@@ -3,6 +3,11 @@ module Api
     module Client
       class PasswordController < BaseController
         include ClientAuthResponses
+        include RateLimitable
+
+        before_action only: :update do
+          throttle!(bucket: "client-password-change", limit: 5, period: 10.minutes, scope: @current_client.id)
+        end
 
         def update
           unless @current_client.authenticate(params.require(:current_password))

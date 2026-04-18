@@ -3,4 +3,5 @@ set -euo pipefail
 
 bundle exec brakeman --no-pager
 bundle exec rubocop
+bin/validate-openapi
 bundle exec rspec

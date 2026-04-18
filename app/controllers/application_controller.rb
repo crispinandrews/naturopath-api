@@ -105,16 +105,20 @@ class ApplicationController < ActionController::API
 
   def render_resource(record, serializer:, status: :ok, meta: nil)
     render json: {
-      data: serializer.as_json(record),
+      data: serializer.as_json(record, context: serializer_context),
       meta: meta
     }.compact, status: status
   end
 
   def render_collection(records, serializer:, meta: {})
     render json: {
-      data: serializer.collection(records),
+      data: serializer.collection(records, context: serializer_context),
       meta: meta
     }, status: :ok
+  end
+
+  def serializer_context
+    nil
   end
 
   def request_context(extra_context = {})

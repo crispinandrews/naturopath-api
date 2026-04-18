@@ -1,9 +1,9 @@
 class ClientSerializer
-  def self.collection(records)
-    records.map { |record| as_json(record) }
+  def self.collection(records, context: nil)
+    records.map { |record| as_json(record, context: context) }
   end
 
-  def self.as_json(client, include_invite_token: false)
+  def self.as_json(client, include_invite_token: false, context: nil)
     payload = {
       id: client.id,
       email: client.email,
