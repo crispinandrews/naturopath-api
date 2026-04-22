@@ -16,7 +16,13 @@ Rails.application.routes.draw do
 
       # Practitioner-facing: manage clients
       resources :clients, only: [ :index, :show, :create, :update, :destroy ] do
+        get  :roster_summary, on: :collection
         post :resend_invite, on: :member
+      end
+
+      # Practitioner schedule (cross-client)
+      resources :appointments, only: [ :index ], controller: "practitioner/schedule" do
+        collection { get :upcoming }
       end
 
       # Practitioner-facing: view client entries
@@ -27,6 +33,11 @@ Rails.application.routes.draw do
         resources :sleep_logs, only: [ :index ], controller: "practitioner/sleep_logs"
         resources :water_intakes, only: [ :index ], controller: "practitioner/water_intakes"
         resources :supplements, only: [ :index ], controller: "practitioner/supplements"
+        resources :notes, only: [ :index, :show, :create, :update, :destroy ],
+                          controller: "practitioner/notes"
+        resources :appointments, only: [ :index, :show, :create, :update, :destroy ],
+                                  controller: "practitioner/appointments"
+        get :daily_aggregates, controller: "practitioner/daily_aggregates", action: :show
       end
 
       # Client-facing: manage own entries

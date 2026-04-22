@@ -44,6 +44,10 @@ module Api
         head :no_content
       end
 
+      def roster_summary
+        render json: { data: [] }
+      end
+
       def resend_invite
         @client.refresh_invite!
         deliver_invite_email(@client)
@@ -66,7 +70,7 @@ module Api
       end
 
       def client_params
-        params.permit(:email, :first_name, :last_name, :date_of_birth)
+        params.permit(:email, :first_name, :last_name, :date_of_birth, :focus_tag)
       end
 
       def deliver_invite_email(client)
