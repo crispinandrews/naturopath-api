@@ -45,7 +45,9 @@ module Api
       end
 
       def roster_summary
-        render json: { data: [] }
+        tz_name = params.fetch(:tz, "UTC")
+        data = RosterSummaryService.new(@current_practitioner, tz_name: tz_name).call
+        render json: { data: data }
       end
 
       def resend_invite
