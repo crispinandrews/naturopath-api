@@ -334,7 +334,7 @@ RSpec.describe "Roster summary", type: :request do
         client       = create_client(practitioner: practitioner, accepted: true)
         # Prior 7 days: 2 symptoms on 1 day → avg = 2.0
         2.times { client.symptoms.create!(name: "Fatigue", occurred_at: 10.days.ago) }
-        # Last 7 days: 2 symptoms on 1 day → avg = 2.0 (2.0 is not > 3.0)
+        # Last 7 days: 2 symptoms on 1 day → avg = 2.0 (2.0 is not > 1.5 * 2.0 = 3.0)
         2.times { client.symptoms.create!(name: "Fatigue", occurred_at: 3.days.ago) }
 
         get_roster(practitioner: practitioner)

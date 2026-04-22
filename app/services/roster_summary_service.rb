@@ -141,12 +141,12 @@ class RosterSummaryService
     return {} if ids.empty?
     id_in              = ids.map(&:to_i).join(", ")
     two_weeks_start_ts = ActiveRecord::Base.connection.quote(two_weeks_start)
-    week1_start_date   = @today - 6
+    week1_start_quoted = ActiveRecord::Base.connection.quote((@today - 6).to_s)
 
     sql = <<~SQL
       SELECT client_id,
-             AVG(CASE WHEN day >= '#{week1_start_date}' THEN daily_count END) AS last7_avg,
-             AVG(CASE WHEN day <  '#{week1_start_date}' THEN daily_count END) AS prior7_avg
+             AVG(CASE WHEN day >= #{week1_start_quoted} THEN daily_count END) AS last7_avg,
+             AVG(CASE WHEN day <  #{week1_start_quoted} THEN daily_count END) AS prior7_avg
       FROM (
         SELECT client_id,
                #{tz_day('occurred_at')} AS day,
