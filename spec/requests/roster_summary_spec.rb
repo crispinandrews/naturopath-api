@@ -286,6 +286,16 @@ RSpec.describe "Roster summary", type: :request do
       expect(response_data.first["flags"]).not_to include("gap")
     end
 
+    it "includes 'gap' when the client last logged exactly 3 days ago" do
+      practitioner = create_practitioner
+      client       = create_client(practitioner: practitioner, accepted: true)
+      client.energy_logs.create!(level: 5, recorded_at: 3.days.ago)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["flags"]).to include("gap")
+    end
+
     it "does not include 'gap' for a pending client even if they have never logged" do
       practitioner = create_practitioner
       create_client(practitioner: practitioner, accepted: false)
