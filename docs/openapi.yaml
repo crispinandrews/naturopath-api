@@ -15,6 +15,7 @@ tags:
   - name: Client Auth
   - name: Practitioner Clients
   - name: Practitioner Health Records
+  - name: Practitioner Schedule
   - name: Client Profile
   - name: Client Health Records
   - name: Client Consents
@@ -328,6 +329,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+
+  /api/v1/clients/roster_summary:
+    get:
+      tags: [Practitioner Clients]
+      summary: Return a dashboard-oriented summary for all owned clients
+      parameters:
+        - name: tz
+          in: query
+          required: false
+          description: IANA timezone used for day-boundary calculations. Falls back to UTC when unrecognised.
+          schema:
+            type: string
+            example: Australia/Sydney
+      responses:
+        "200":
+          description: Unpaginated roster summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RosterSummaryEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/appointments:
+    get:
+      tags: [Practitioner Schedule]
+      summary: List appointments across all clients for the authenticated practitioner
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [scheduled, completed, cancelled, no_show]
+      responses:
+        "200":
+          description: Paginated schedule view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleAppointmentCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidScheduleQuery"
+
+  /api/v1/appointments/upcoming:
+    get:
+      tags: [Practitioner Schedule]
+      summary: Return the next scheduled appointments across all owned clients
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Upcoming appointments ordered by soonest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleAppointmentListEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidParameter"
 
   /api/v1/client/profile:
     get:
@@ -1070,6 +1145,244 @@ paths:
         "422":
           $ref: "#/components/responses/InvalidListQuery"
 
+  /api/v1/clients/{client_id}/daily_aggregates:
+    get:
+      tags: [Practitioner Health Records]
+      summary: Return daily aggregate metrics for an owned client over a date range
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: tz
+          in: query
+          required: false
+          description: IANA timezone used for day-boundary calculations. Falls back to UTC when unrecognised.
+          schema:
+            type: string
+            example: UTC
+        - name: metrics
+          in: query
+          required: false
+          description: Comma-separated subset of metrics to compute.
+          schema:
+            type: string
+            example: sleep,energy,symptoms
+      responses:
+        "200":
+          description: One row per day in the inclusive date range
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyAggregateEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/InvalidParameter"
+
+  /api/v1/clients/{client_id}/notes:
+    parameters:
+      - $ref: "#/components/parameters/ClientId"
+    get:
+      tags: [Practitioner Health Records]
+      summary: List practitioner notes for an owned client
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Paginated practitioner notes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PractitionerNoteCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/InvalidPagination"
+    post:
+      tags: [Practitioner Health Records]
+      summary: Create a practitioner note for an owned client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PractitionerNoteWriteRequest"
+      responses:
+        "201":
+          description: Practitioner note created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PractitionerNoteEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/clients/{client_id}/notes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ClientId"
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Practitioner Health Records]
+      summary: Show a practitioner note for an owned client
+      responses:
+        "200":
+          description: Practitioner note detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PractitionerNoteEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Practitioner Health Records]
+      summary: Update a practitioner note for an owned client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PractitionerNoteWriteRequest"
+      responses:
+        "200":
+          description: Practitioner note updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PractitionerNoteEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    delete:
+      tags: [Practitioner Health Records]
+      summary: Delete a practitioner note for an owned client
+      responses:
+        "204":
+          description: Practitioner note deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/clients/{client_id}/appointments:
+    parameters:
+      - $ref: "#/components/parameters/ClientId"
+    get:
+      tags: [Practitioner Schedule]
+      summary: List appointments for an owned client
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Paginated appointment list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentCollectionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/InvalidPagination"
+    post:
+      tags: [Practitioner Schedule]
+      summary: Create an appointment for an owned client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentWriteRequest"
+      responses:
+        "201":
+          description: Appointment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/clients/{client_id}/appointments/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ClientId"
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Practitioner Schedule]
+      summary: Show an appointment for an owned client
+      responses:
+        "200":
+          description: Appointment detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Practitioner Schedule]
+      summary: Update an appointment for an owned client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentWriteRequest"
+      responses:
+        "200":
+          description: Appointment updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    delete:
+      tags: [Practitioner Schedule]
+      summary: Delete an appointment for an owned client
+      responses:
+        "204":
+          description: Appointment deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1189,6 +1502,18 @@ components:
             $ref: "#/components/schemas/ErrorEnvelope"
     InvalidPagination:
       description: Invalid pagination parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    InvalidParameter:
+      description: Invalid query parameter or unsupported value
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    InvalidScheduleQuery:
+      description: Invalid schedule query parameter such as an unsupported status or invalid date filter
       content:
         application/json:
           schema:
@@ -1330,7 +1655,7 @@ components:
 
     Client:
       type: object
-      required: [id, email, first_name, last_name, practitioner_id, invite_accepted, created_at]
+      required: [id, email, first_name, last_name, practitioner_id, invite_accepted, focus_tag, created_at]
       properties:
         id:
           type: integer
@@ -1348,6 +1673,9 @@ components:
           type: integer
         invite_accepted:
           type: boolean
+        focus_tag:
+          type: [string, "null"]
+          maxLength: 80
         invite_expires_at:
           type: string
           format: date-time
@@ -1407,6 +1735,9 @@ components:
         date_of_birth:
           type: string
           format: date
+        focus_tag:
+          type: [string, "null"]
+          maxLength: 80
 
     ClientProfileUpdateRequest:
       $ref: "#/components/schemas/ClientWriteRequest"
@@ -1440,6 +1771,7 @@ components:
                 - validation_failed
                 - invalid_date_filter
                 - invalid_pagination
+                - invalid_parameter
                 - invalid_refresh_token
                 - invalid_reset_token
                 - invalid_sync_payload
@@ -1730,6 +2062,184 @@ components:
           type: string
           format: date-time
 
+    ClientSummary:
+      type: object
+      required: [id, first_name, last_name, focus_tag]
+      properties:
+        id:
+          type: integer
+        first_name:
+          type: string
+        last_name:
+          type: string
+        focus_tag:
+          type: [string, "null"]
+
+    Appointment:
+      type: object
+      required: [id, client_id, practitioner_id, scheduled_at, duration_minutes, appointment_type, status, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        practitioner_id:
+          type: integer
+        scheduled_at:
+          type: string
+          format: date-time
+        duration_minutes:
+          type: integer
+        appointment_type:
+          type: string
+          enum: [intake, follow_up, labs_review, check_in]
+        status:
+          type: string
+          enum: [scheduled, completed, cancelled, no_show]
+        notes:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ScheduleAppointment:
+      allOf:
+        - $ref: "#/components/schemas/Appointment"
+        - type: object
+          required: [client]
+          properties:
+            client:
+              $ref: "#/components/schemas/ClientSummary"
+
+    AppointmentWriteRequest:
+      type: object
+      properties:
+        scheduled_at:
+          type: string
+          format: date-time
+        duration_minutes:
+          type: integer
+          minimum: 1
+        appointment_type:
+          type: string
+          enum: [intake, follow_up, labs_review, check_in]
+        status:
+          type: string
+          enum: [scheduled, completed, cancelled, no_show]
+        notes:
+          type: string
+
+    PractitionerNote:
+      type: object
+      required: [id, client_id, author_id, note_type, body, pinned, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        author_id:
+          type: integer
+        note_type:
+          type: string
+          enum: [session, intake, message, observation]
+        body:
+          type: string
+        pinned:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PractitionerNoteWriteRequest:
+      type: object
+      properties:
+        note_type:
+          type: string
+          enum: [session, intake, message, observation]
+        body:
+          type: string
+        pinned:
+          type: boolean
+
+    DailyAggregateRow:
+      type: object
+      required: [date, sleep_hours, energy_level, symptom_count, water_ml, food_entries, supplement_doses]
+      properties:
+        date:
+          type: string
+          format: date
+        sleep_hours:
+          type: [number, "null"]
+        energy_level:
+          type: [number, "null"]
+        symptom_count:
+          type: [integer, "null"]
+        water_ml:
+          type: [integer, "null"]
+        food_entries:
+          type: [integer, "null"]
+        supplement_doses:
+          type: [integer, "null"]
+
+    DailyAggregateMeta:
+      type: object
+      required: [from, to, client_id]
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        client_id:
+          type: integer
+
+    RosterSummaryAppointment:
+      type: object
+      required: [id, scheduled_at, appointment_type, duration_minutes]
+      properties:
+        id:
+          type: integer
+        scheduled_at:
+          type: string
+          format: date-time
+        appointment_type:
+          type: string
+        duration_minutes:
+          type: integer
+
+    RosterSummaryItem:
+      type: object
+      required: [client_id, energy_sparkline, adherence_days, last_logged_days_ago, next_appointment, flags]
+      properties:
+        client_id:
+          type: integer
+        energy_sparkline:
+          type: array
+          minItems: 30
+          maxItems: 30
+          items:
+            type: [number, "null"]
+        adherence_days:
+          type: integer
+        last_logged_days_ago:
+          type: [integer, "null"]
+        next_appointment:
+          oneOf:
+            - $ref: "#/components/schemas/RosterSummaryAppointment"
+            - type: "null"
+        flags:
+          type: array
+          items:
+            type: string
+            enum: [new, gap, symptom-up, sleep-down]
+
     ClientEnvelope:
       type: object
       required: [data]
@@ -1774,6 +2284,75 @@ components:
             $ref: "#/components/schemas/Consent"
         meta:
           $ref: "#/components/schemas/PaginationMeta"
+
+    AppointmentEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Appointment"
+    AppointmentCollectionEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Appointment"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+    ScheduleAppointmentCollectionEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleAppointment"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+    ScheduleAppointmentListEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleAppointment"
+    PractitionerNoteEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/PractitionerNote"
+    PractitionerNoteCollectionEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PractitionerNote"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+    DailyAggregateEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyAggregateRow"
+        meta:
+          $ref: "#/components/schemas/DailyAggregateMeta"
+    RosterSummaryEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RosterSummaryItem"
 
     FoodEntryEnvelope:
       type: object

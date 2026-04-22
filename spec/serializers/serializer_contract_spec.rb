@@ -87,4 +87,25 @@ RSpec.describe "Serializer contracts" do
 
     expect(collection.first).not_to have_key(:client_id)
   end
+
+  it "includes a minimal client payload for schedule serialization" do
+    practitioner = create_practitioner
+    client = create_client(practitioner: practitioner, focus_tag: "sleep")
+    appointment = client.appointments.create!(
+      practitioner: practitioner,
+      scheduled_at: Time.zone.parse("2026-04-10 10:00:00"),
+      duration_minutes: 45,
+      appointment_type: "check_in",
+      status: "scheduled"
+    )
+
+    serialized = AppointmentSerializer.as_json(appointment, context: :schedule)
+
+    expect(serialized[:client]).to eq(
+      id: client.id,
+      first_name: client.first_name,
+      last_name: client.last_name,
+      focus_tag: "sleep"
+    )
+  end
 end

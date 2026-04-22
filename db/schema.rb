@@ -10,9 +10,25 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_04_12_101000) do
+ActiveRecord::Schema[7.2].define(version: 2026_04_19_120003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "appointments", force: :cascade do |t|
+    t.bigint "client_id", null: false
+    t.bigint "practitioner_id", null: false
+    t.datetime "scheduled_at", null: false
+    t.integer "duration_minutes", default: 60, null: false
+    t.string "appointment_type", null: false
+    t.string "status", default: "scheduled", null: false
+    t.text "notes"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["client_id", "scheduled_at"], name: "index_appointments_on_client_id_and_scheduled_at"
+    t.index ["client_id"], name: "index_appointments_on_client_id"
+    t.index ["practitioner_id", "scheduled_at"], name: "index_appointments_on_practitioner_id_and_scheduled_at"
+    t.index ["practitioner_id"], name: "index_appointments_on_practitioner_id"
+  end
 
   create_table "clients", force: :cascade do |t|
     t.bigint "practitioner_id", null: false
@@ -26,6 +42,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_12_101000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.datetime "invite_expires_at"
+    t.string "focus_tag"
     t.index ["email"], name: "index_clients_on_email", unique: true
     t.index ["invite_expires_at"], name: "index_clients_on_invite_expires_at"
     t.index ["invite_token"], name: "index_clients_on_invite_token", unique: true
@@ -82,6 +99,20 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_12_101000) do
     t.index ["client_id"], name: "index_password_reset_tokens_on_client_id"
     t.index ["expires_at"], name: "index_password_reset_tokens_on_expires_at"
     t.index ["token_digest"], name: "index_password_reset_tokens_on_token_digest", unique: true
+  end
+
+  create_table "practitioner_notes", force: :cascade do |t|
+    t.bigint "client_id", null: false
+    t.bigint "author_id", null: false
+    t.string "note_type", null: false
+    t.text "body", null: false
+    t.boolean "pinned", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["author_id"], name: "index_practitioner_notes_on_author_id"
+    t.index ["client_id", "created_at"], name: "index_practitioner_notes_on_client_id_and_created_at"
+    t.index ["client_id", "pinned"], name: "index_practitioner_notes_on_client_id_and_pinned"
+    t.index ["client_id"], name: "index_practitioner_notes_on_client_id"
   end
 
   create_table "practitioners", force: :cascade do |t|
@@ -166,11 +197,15 @@ ActiveRecord::Schema[7.2].define(version: 2026_04_12_101000) do
     t.index ["client_id"], name: "index_water_intakes_on_client_id"
   end
 
+  add_foreign_key "appointments", "clients"
+  add_foreign_key "appointments", "practitioners"
   add_foreign_key "clients", "practitioners"
   add_foreign_key "consents", "clients"
   add_foreign_key "energy_logs", "clients"
   add_foreign_key "food_entries", "clients"
   add_foreign_key "password_reset_tokens", "clients"
+  add_foreign_key "practitioner_notes", "clients"
+  add_foreign_key "practitioner_notes", "practitioners", column: "author_id"
   add_foreign_key "refresh_tokens", "clients"
   add_foreign_key "refresh_tokens", "refresh_tokens", column: "replaced_by_token_id"
   add_foreign_key "sleep_logs", "clients"

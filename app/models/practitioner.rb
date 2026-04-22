@@ -2,6 +2,7 @@ class Practitioner < ApplicationRecord
   has_secure_password
 
   has_many :clients, dependent: :destroy
+  has_many :appointments
 
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }

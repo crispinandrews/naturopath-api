@@ -15,12 +15,15 @@ class Client < ApplicationRecord
   has_many :consents, dependent: :destroy
   has_many :refresh_tokens, dependent: :destroy
   has_many :password_reset_tokens, dependent: :destroy
+  has_many :practitioner_notes, dependent: :destroy
+  has_many :appointments, dependent: :destroy
 
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :first_name, :last_name, presence: true
   validates :password, presence: true, length: { minimum: 8 }, if: :password_required?
   validates :invite_expires_at, presence: true, if: :pending_invite?
+  validates :focus_tag, length: { maximum: 80 }, allow_nil: true
 
   normalizes :email, with: ->(email) { email.strip.downcase }
 

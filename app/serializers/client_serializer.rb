@@ -11,7 +11,8 @@ class ClientSerializer
       last_name: client.last_name,
       date_of_birth: client.date_of_birth,
       practitioner_id: client.practitioner_id,
-      invite_accepted: client.invite_accepted_at.present?
+      invite_accepted: client.invite_accepted_at.present?,
+      focus_tag: client.focus_tag
     }
 
     payload[:invite_expires_at] = client.invite_expires_at if include_invite_expiry?(client)

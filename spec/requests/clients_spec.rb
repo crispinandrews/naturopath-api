@@ -166,4 +166,52 @@ RSpec.describe "Practitioner client management", type: :request do
 
     expect_error_response(status: :not_found, code: "not_found", message: "Not found")
   end
+
+  it "includes focus_tag in the client response" do
+    practitioner = create_practitioner
+    client = create_client(practitioner: practitioner)
+    client.update!(focus_tag: "gut health")
+
+    get "/api/v1/clients/#{client.id}", headers: auth_headers_for(practitioner)
+
+    expect(response).to have_http_status(:ok)
+    expect(response_data["focus_tag"]).to eq("gut health")
+  end
+
+  it "returns focus_tag as nil when not set" do
+    practitioner = create_practitioner
+    client = create_client(practitioner: practitioner)
+
+    get "/api/v1/clients/#{client.id}", headers: auth_headers_for(practitioner)
+
+    expect(response).to have_http_status(:ok)
+    expect(response_data["focus_tag"]).to be_nil
+  end
+
+  it "updates focus_tag via PATCH" do
+    practitioner = create_practitioner
+    client = create_client(practitioner: practitioner)
+
+    patch "/api/v1/clients/#{client.id}",
+      params: { focus_tag: "energy & sleep" },
+      headers: auth_headers_for(practitioner),
+      as: :json
+
+    expect(response).to have_http_status(:ok)
+    expect(response_data["focus_tag"]).to eq("energy & sleep")
+    expect(client.reload.focus_tag).to eq("energy & sleep")
+  end
+
+  it "rejects focus_tag longer than 80 characters" do
+    practitioner = create_practitioner
+    client = create_client(practitioner: practitioner)
+
+    patch "/api/v1/clients/#{client.id}",
+      params: { focus_tag: "x" * 81 },
+      headers: auth_headers_for(practitioner),
+      as: :json
+
+    expect_error_response(status: 422, code: "validation_failed", message: "Validation failed")
+    expect(json_response.dig("error", "details")).to include(match(/focus tag/i))
+  end
 end

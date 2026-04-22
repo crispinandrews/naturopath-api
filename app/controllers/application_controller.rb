@@ -1,9 +1,11 @@
 class ApplicationController < ActionController::API
   class InvalidDateFilterError < StandardError; end
   class InvalidPaginationError < StandardError; end
+  class InvalidParameterError < StandardError; end
 
   rescue_from InvalidDateFilterError, with: :render_invalid_date_filter
   rescue_from InvalidPaginationError, with: :render_invalid_pagination
+  rescue_from InvalidParameterError, with: :render_invalid_parameter
   rescue_from ActionController::ParameterMissing, with: :render_parameter_missing
   rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
   rescue_from StandardError, with: :render_internal_server_error unless Rails.env.development? || Rails.env.test?
@@ -71,6 +73,14 @@ class ApplicationController < ActionController::API
   def render_invalid_pagination(error)
     render_error(
       code: "invalid_pagination",
+      message: error.message,
+      status: :unprocessable_entity
+    )
+  end
+
+  def render_invalid_parameter(error)
+    render_error(
+      code: "invalid_parameter",
       message: error.message,
       status: :unprocessable_entity
     )
