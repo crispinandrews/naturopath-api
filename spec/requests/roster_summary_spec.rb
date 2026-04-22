@@ -98,4 +98,79 @@ RSpec.describe "Roster summary", type: :request do
       expect(sparkline[29]).to eq(8.0)
     end
   end
+
+  describe "adherence_days" do
+    it "is 0 when the client has never logged anything" do
+      practitioner = create_practitioner
+      create_client(practitioner: practitioner)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["adherence_days"]).to eq(0)
+    end
+
+    it "counts distinct days with any entry across all six entry types" do
+      practitioner = create_practitioner
+      client       = create_client(practitioner: practitioner)
+      day = Time.current.beginning_of_day
+      # Two energy logs on same day — counts as 1 day
+      client.energy_logs.create!(level: 7, recorded_at: day)
+      client.energy_logs.create!(level: 8, recorded_at: day + 1.hour)
+      # One sleep log on a different day
+      client.sleep_logs.create!(hours_slept: 7, bedtime: day - 1.day, wake_time: day - 1.day + 7.hours)
+      # One symptom, water, food, supplement each on yet another day
+      client.symptoms.create!(name: "Headache", occurred_at: day - 2.days)
+      client.water_intakes.create!(amount_ml: 500, recorded_at: day - 3.days)
+      client.food_entries.create!(consumed_at: day - 4.days, meal_type: "lunch", description: "Salad")
+      client.supplements.create!(name: "Vitamin D", taken_at: day - 5.days)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["adherence_days"]).to eq(6)
+    end
+
+    it "does not count entries older than 30 days" do
+      practitioner = create_practitioner
+      client       = create_client(practitioner: practitioner)
+      client.energy_logs.create!(level: 7, recorded_at: 31.days.ago)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["adherence_days"]).to eq(0)
+    end
+  end
+
+  describe "last_logged_days_ago" do
+    it "is null when the client has never logged anything" do
+      practitioner = create_practitioner
+      create_client(practitioner: practitioner)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["last_logged_days_ago"]).to be_nil
+    end
+
+    it "is 0 when the most recent entry was today" do
+      practitioner = create_practitioner
+      client       = create_client(practitioner: practitioner)
+      client.energy_logs.create!(level: 7, recorded_at: Time.current)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["last_logged_days_ago"]).to eq(0)
+    end
+
+    it "is the correct integer days since the most recent entry across all types" do
+      practitioner = create_practitioner
+      client       = create_client(practitioner: practitioner)
+      # Most recent entry: 3 days ago (a supplement)
+      client.supplements.create!(name: "Zinc", taken_at: 3.days.ago)
+      # Older entry: 10 days ago (energy log) — should not affect result
+      client.energy_logs.create!(level: 5, recorded_at: 10.days.ago)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["last_logged_days_ago"]).to eq(3)
+    end
+  end
 end
