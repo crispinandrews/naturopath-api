@@ -173,4 +173,76 @@ RSpec.describe "Roster summary", type: :request do
       expect(response_data.first["last_logged_days_ago"]).to eq(3)
     end
   end
+
+  describe "next_appointment" do
+    def create_appointment(client:, practitioner:, **attrs)
+      client.appointments.create!({
+        practitioner:     practitioner,
+        scheduled_at:     1.week.from_now,
+        duration_minutes: 60,
+        appointment_type: "follow_up",
+        status:           "scheduled"
+      }.merge(attrs))
+    end
+
+    it "is null when the client has no upcoming scheduled appointment" do
+      practitioner = create_practitioner
+      create_client(practitioner: practitioner)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["next_appointment"]).to be_nil
+    end
+
+    it "is null for past appointments" do
+      practitioner = create_practitioner
+      client       = create_client(practitioner: practitioner)
+      create_appointment(client: client, practitioner: practitioner,
+                         scheduled_at: 1.day.ago)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["next_appointment"]).to be_nil
+    end
+
+    it "is null for cancelled appointments" do
+      practitioner = create_practitioner
+      client       = create_client(practitioner: practitioner)
+      create_appointment(client: client, practitioner: practitioner,
+                         status: "cancelled")
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["next_appointment"]).to be_nil
+    end
+
+    it "returns the earliest scheduled upcoming appointment" do
+      practitioner = create_practitioner
+      client       = create_client(practitioner: practitioner)
+      create_appointment(client: client, practitioner: practitioner,
+                         scheduled_at: 2.weeks.from_now, appointment_type: "check_in")
+      first = create_appointment(client: client, practitioner: practitioner,
+                                 scheduled_at: 3.days.from_now, appointment_type: "labs_review",
+                                 duration_minutes: 45)
+
+      get_roster(practitioner: practitioner)
+
+      appt = response_data.first["next_appointment"]
+      expect(appt["id"]).to eq(first.id)
+      expect(appt["appointment_type"]).to eq("labs_review")
+      expect(appt["duration_minutes"]).to eq(45)
+      expect(appt["scheduled_at"]).to match(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/)
+    end
+
+    it "returns only the four specified fields" do
+      practitioner = create_practitioner
+      client       = create_client(practitioner: practitioner)
+      create_appointment(client: client, practitioner: practitioner)
+
+      get_roster(practitioner: practitioner)
+
+      appt = response_data.first["next_appointment"]
+      expect(appt.keys).to match_array(%w[id scheduled_at appointment_type duration_minutes])
+    end
+  end
 end

@@ -12,13 +12,14 @@ class RosterSummaryService
 
     ids = clients.map(&:id)
 
-    sparklines = fetch_sparklines(ids)
-    adherence  = fetch_adherence(ids)
+    sparklines  = fetch_sparklines(ids)
+    adherence   = fetch_adherence(ids)
+    next_appts  = fetch_next_appointments(ids)
 
     clients.map do |client|
       id  = client.id
       adh = adherence[id] || {}
-      last_logged_at   = adh[:last_logged_at]
+      last_logged_at       = adh[:last_logged_at]
       last_logged_days_ago = last_logged_at ? (@today - last_logged_at.in_time_zone(@tz).to_date).to_i : nil
 
       {
@@ -26,7 +27,7 @@ class RosterSummaryService
         energy_sparkline:     sparklines.fetch(id, Array.new(30)),
         adherence_days:       adh[:adherence_days] || 0,
         last_logged_days_ago: last_logged_days_ago,
-        next_appointment:     nil,
+        next_appointment:     next_appts[id],
         flags:                []
       }
     end
@@ -97,6 +98,30 @@ class RosterSummaryService
       h[r["client_id"]] = {
         adherence_days: r["adherence_days"].to_i,
         last_logged_at: last_logged_at
+      }
+    end
+  end
+
+  def fetch_next_appointments(ids)
+    id_in = ids.map(&:to_i).join(", ")
+    sql = <<~SQL
+      SELECT DISTINCT ON (client_id)
+        client_id, id, scheduled_at, appointment_type, duration_minutes
+      FROM appointments
+      WHERE client_id IN (#{id_in})
+        AND status = 'scheduled'
+        AND scheduled_at > NOW()
+      ORDER BY client_id, scheduled_at ASC
+    SQL
+
+    ActiveRecord::Base.connection.exec_query(sql).each_with_object({}) do |r, h|
+      ts = r["scheduled_at"]
+      scheduled_at = ts.respond_to?(:utc) ? ts.utc : Time.parse(ts.to_s).utc
+      h[r["client_id"]] = {
+        "id"               => r["id"],
+        "scheduled_at"     => scheduled_at.iso8601,
+        "appointment_type" => r["appointment_type"],
+        "duration_minutes" => r["duration_minutes"].to_i
       }
     end
   end
