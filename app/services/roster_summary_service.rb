@@ -140,7 +140,6 @@ class RosterSummaryService
   end
 
   def fetch_symptom_windows(ids)
-    return {} if ids.empty?
     id_in              = ids.map(&:to_i).join(", ")
     two_weeks_start_ts = ActiveRecord::Base.connection.quote(two_weeks_start)
     week1_start_quoted = ActiveRecord::Base.connection.quote((@today - 6).to_s)
@@ -177,7 +176,6 @@ class RosterSummaryService
   end
 
   def fetch_sleep_windows(ids)
-    return {} if ids.empty?
     id_in              = ids.map(&:to_i).join(", ")
     two_weeks_start_ts = ActiveRecord::Base.connection.quote(two_weeks_start)
     week1_start_quoted = ActiveRecord::Base.connection.quote((@today - 6).to_s)
