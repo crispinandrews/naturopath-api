@@ -12,9 +12,10 @@ class RosterSummaryService
 
     ids = clients.map(&:id)
 
-    sparklines = fetch_sparklines(ids)
-    adherence  = fetch_adherence(ids)
-    next_appts = fetch_next_appointments(ids)
+    sparklines    = fetch_sparklines(ids)
+    adherence     = fetch_adherence(ids)
+    next_appts    = fetch_next_appointments(ids)
+    symptom_wins  = fetch_symptom_windows(ids)
 
     clients.map do |client|
       id  = client.id
@@ -24,8 +25,9 @@ class RosterSummaryService
       pending              = client.invite_accepted_at.nil?
 
       flags = []
-      flags << "new" if pending
-      flags << "gap" if !pending && last_logged_days_ago && last_logged_days_ago >= 3
+      flags << "new"         if pending
+      flags << "gap"         if !pending && last_logged_days_ago && last_logged_days_ago >= 3
+      flags << "symptom-up"  if symptom_up?(symptom_wins[id])
 
       {
         client_id:            id,
@@ -42,6 +44,10 @@ class RosterSummaryService
 
   def window_start
     @window_start ||= @tz.local(@today.year, @today.month, @today.day) - 29.days
+  end
+
+  def two_weeks_start
+    @two_weeks_start ||= @tz.local(@today.year, @today.month, @today.day) - 13.days
   end
 
   def tz_day(col)
@@ -129,5 +135,42 @@ class RosterSummaryService
         "duration_minutes" => r["duration_minutes"].to_i
       }
     end
+  end
+
+  def fetch_symptom_windows(ids)
+    return {} if ids.empty?
+    id_in              = ids.map(&:to_i).join(", ")
+    two_weeks_start_ts = ActiveRecord::Base.connection.quote(two_weeks_start)
+    week1_start_date   = @today - 6
+
+    sql = <<~SQL
+      SELECT client_id,
+             AVG(CASE WHEN day >= '#{week1_start_date}' THEN daily_count END) AS last7_avg,
+             AVG(CASE WHEN day <  '#{week1_start_date}' THEN daily_count END) AS prior7_avg
+      FROM (
+        SELECT client_id,
+               #{tz_day('occurred_at')} AS day,
+               COUNT(*) AS daily_count
+        FROM symptoms
+        WHERE client_id IN (#{id_in})
+          AND occurred_at >= #{two_weeks_start_ts}
+        GROUP BY client_id, #{tz_day('occurred_at')}
+      ) daily
+      GROUP BY client_id
+    SQL
+
+    ActiveRecord::Base.connection.exec_query(sql).each_with_object({}) do |r, h|
+      h[r["client_id"]] = {
+        last7_avg:  r["last7_avg"]&.to_f,
+        prior7_avg: r["prior7_avg"]&.to_f
+      }
+    end
+  end
+
+  def symptom_up?(window)
+    return false unless window
+    last7  = window[:last7_avg]
+    prior7 = window[:prior7_avg]
+    !last7.nil? && !prior7.nil? && last7 > prior7 * 1.5
   end
 end

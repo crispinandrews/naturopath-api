@@ -314,5 +314,44 @@ RSpec.describe "Roster summary", type: :request do
       # last_logged_days_ago is nil — gap only fires when there IS a known last log >= 3 days ago
       expect(response_data.first["flags"]).not_to include("gap")
     end
+
+    describe "'symptom-up' flag" do
+      it "includes 'symptom-up' when last 7 days average > 1.5x prior 7 days average" do
+        practitioner = create_practitioner
+        client       = create_client(practitioner: practitioner, accepted: true)
+        # Prior 7 days: 1 symptom on 1 day → avg = 1.0
+        client.symptoms.create!(name: "Fatigue", occurred_at: 10.days.ago)
+        # Last 7 days: 3 symptoms on 1 day → avg = 3.0 (3.0 > 1.5 * 1.0)
+        3.times { client.symptoms.create!(name: "Fatigue", occurred_at: 3.days.ago) }
+
+        get_roster(practitioner: practitioner)
+
+        expect(response_data.first["flags"]).to include("symptom-up")
+      end
+
+      it "excludes 'symptom-up' when last 7 days average is not > 1.5x prior" do
+        practitioner = create_practitioner
+        client       = create_client(practitioner: practitioner, accepted: true)
+        # Prior 7 days: 2 symptoms on 1 day → avg = 2.0
+        2.times { client.symptoms.create!(name: "Fatigue", occurred_at: 10.days.ago) }
+        # Last 7 days: 2 symptoms on 1 day → avg = 2.0 (2.0 is not > 3.0)
+        2.times { client.symptoms.create!(name: "Fatigue", occurred_at: 3.days.ago) }
+
+        get_roster(practitioner: practitioner)
+
+        expect(response_data.first["flags"]).not_to include("symptom-up")
+      end
+
+      it "excludes 'symptom-up' when either window has no data" do
+        practitioner = create_practitioner
+        client       = create_client(practitioner: practitioner, accepted: true)
+        # Only last 7 days has data — prior window is empty
+        3.times { client.symptoms.create!(name: "Fatigue", occurred_at: 3.days.ago) }
+
+        get_roster(practitioner: practitioner)
+
+        expect(response_data.first["flags"]).not_to include("symptom-up")
+      end
+    end
   end
 end
