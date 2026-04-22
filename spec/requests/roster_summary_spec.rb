@@ -247,6 +247,61 @@ RSpec.describe "Roster summary", type: :request do
     end
   end
 
+  describe "tz param" do
+    it "assigns energy log to today's slot when tz shifts the timestamp to today" do
+      travel_to Time.utc(2026, 4, 15, 1, 0, 0) do
+        practitioner = create_practitioner
+        client       = create_client(practitioner: practitioner, accepted: true)
+        # 2026-04-14 15:00 UTC = 2026-04-15 01:00 AEST — today in AEST, yesterday in UTC
+        client.energy_logs.create!(level: 7.0, recorded_at: Time.utc(2026, 4, 14, 15, 0, 0))
+
+        get_roster(practitioner: practitioner, tz: "Australia/Sydney")
+
+        sparkline = response_data.first["energy_sparkline"]
+        expect(sparkline.last).to eq(7.0)   # index 29 = today in AEST
+        expect(sparkline[-2]).to be_nil     # index 28 = yesterday in AEST (no data)
+      end
+    end
+
+    it "counts an entry as today for adherence when tz shifts the timestamp to today" do
+      travel_to Time.utc(2026, 4, 15, 1, 0, 0) do
+        practitioner = create_practitioner
+        client       = create_client(practitioner: practitioner, accepted: true)
+        # Same entry as above: UTC yesterday, AEST today
+        client.energy_logs.create!(level: 5.0, recorded_at: Time.utc(2026, 4, 14, 15, 0, 0))
+
+        get_roster(practitioner: practitioner, tz: "Australia/Sydney")
+
+        expect(response_data.first["adherence_days"]).to eq(1)
+      end
+    end
+
+    it "returns last_logged_days_ago: 0 when tz shifts the most recent entry to today" do
+      travel_to Time.utc(2026, 4, 15, 1, 0, 0) do
+        practitioner = create_practitioner
+        client       = create_client(practitioner: practitioner, accepted: true)
+        # Same entry: UTC yesterday, AEST today
+        client.energy_logs.create!(level: 5.0, recorded_at: Time.utc(2026, 4, 14, 15, 0, 0))
+
+        get_roster(practitioner: practitioner, tz: "Australia/Sydney")
+
+        expect(response_data.first["last_logged_days_ago"]).to eq(0)
+      end
+    end
+
+    it "falls back to UTC for an unrecognised tz param" do
+      practitioner = create_practitioner
+      client       = create_client(practitioner: practitioner, accepted: true)
+
+      get_roster(practitioner: practitioner, tz: "Not/ATimezone")
+
+      expect(response.status).to eq(200)
+      summary = response_data.first
+      expect(summary).to have_key("energy_sparkline")
+      expect(summary["energy_sparkline"].length).to eq(30)
+    end
+  end
+
   describe "flags" do
     it "includes 'new' for a client who has not accepted their invite" do
       practitioner = create_practitioner
