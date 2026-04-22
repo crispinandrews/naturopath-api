@@ -315,6 +315,45 @@ RSpec.describe "Roster summary", type: :request do
       expect(response_data.first["flags"]).not_to include("gap")
     end
 
+    describe "'sleep-down' flag" do
+      it "includes 'sleep-down' when last 7 days avg hours_slept < prior 7 days avg - 0.5" do
+        practitioner = create_practitioner
+        client       = create_client(practitioner: practitioner, accepted: true)
+        # Prior 7 days: avg = 8.0 hours
+        client.sleep_logs.create!(hours_slept: 8.0, bedtime: 10.days.ago, wake_time: 10.days.ago + 8.hours)
+        # Last 7 days: avg = 6.0 hours (6.0 < 8.0 - 0.5 = 7.5)
+        client.sleep_logs.create!(hours_slept: 6.0, bedtime: 3.days.ago, wake_time: 3.days.ago + 6.hours)
+
+        get_roster(practitioner: practitioner)
+
+        expect(response_data.first["flags"]).to include("sleep-down")
+      end
+
+      it "excludes 'sleep-down' when last 7 days avg is not sufficiently below prior avg" do
+        practitioner = create_practitioner
+        client       = create_client(practitioner: practitioner, accepted: true)
+        # Prior 7 days: avg = 8.0 hours
+        client.sleep_logs.create!(hours_slept: 8.0, bedtime: 10.days.ago, wake_time: 10.days.ago + 8.hours)
+        # Last 7 days: avg = 7.8 hours (7.8 is not < 8.0 - 0.5 = 7.5)
+        client.sleep_logs.create!(hours_slept: 7.8, bedtime: 3.days.ago, wake_time: 3.days.ago + 7.8.hours)
+
+        get_roster(practitioner: practitioner)
+
+        expect(response_data.first["flags"]).not_to include("sleep-down")
+      end
+
+      it "excludes 'sleep-down' when either window has no data" do
+        practitioner = create_practitioner
+        client       = create_client(practitioner: practitioner, accepted: true)
+        # Only last 7 days has data — prior window is empty
+        client.sleep_logs.create!(hours_slept: 5.0, bedtime: 3.days.ago, wake_time: 3.days.ago + 5.hours)
+
+        get_roster(practitioner: practitioner)
+
+        expect(response_data.first["flags"]).not_to include("sleep-down")
+      end
+    end
+
     describe "'symptom-up' flag" do
       it "includes 'symptom-up' when last 7 days average > 1.5x prior 7 days average" do
         practitioner = create_practitioner
