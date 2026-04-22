@@ -118,7 +118,7 @@ class RosterSummaryService
       ts = r["scheduled_at"]
       scheduled_at = ts.respond_to?(:utc) ? ts.utc : Time.parse(ts.to_s).utc
       h[r["client_id"]] = {
-        "id"               => r["id"],
+        "id"               => r["id"].to_i,
         "scheduled_at"     => scheduled_at.iso8601,
         "appointment_type" => r["appointment_type"],
         "duration_minutes" => r["duration_minutes"].to_i

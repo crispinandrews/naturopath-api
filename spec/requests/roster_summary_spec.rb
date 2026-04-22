@@ -229,6 +229,7 @@ RSpec.describe "Roster summary", type: :request do
 
       appt = response_data.first["next_appointment"]
       expect(appt["id"]).to eq(first.id)
+      expect(appt["id"]).to be_an(Integer)
       expect(appt["appointment_type"]).to eq("labs_review")
       expect(appt["duration_minutes"]).to eq(45)
       expect(appt["scheduled_at"]).to match(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/)
