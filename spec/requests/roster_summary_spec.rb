@@ -249,7 +249,7 @@ RSpec.describe "Roster summary", type: :request do
 
   describe "tz param" do
     it "assigns energy log to today's slot when tz shifts the timestamp to today" do
-      travel_to Time.utc(2026, 4, 15, 1, 0, 0) do
+      travel_to Time.utc(2026, 4, 14, 15, 0, 0) do
         practitioner = create_practitioner
         client       = create_client(practitioner: practitioner, accepted: true)
         # 2026-04-14 15:00 UTC = 2026-04-15 01:00 AEST — today in AEST, yesterday in UTC
@@ -264,7 +264,7 @@ RSpec.describe "Roster summary", type: :request do
     end
 
     it "counts an entry as today for adherence when tz shifts the timestamp to today" do
-      travel_to Time.utc(2026, 4, 15, 1, 0, 0) do
+      travel_to Time.utc(2026, 4, 14, 15, 0, 0) do
         practitioner = create_practitioner
         client       = create_client(practitioner: practitioner, accepted: true)
         # Same entry as above: UTC yesterday, AEST today
@@ -277,7 +277,7 @@ RSpec.describe "Roster summary", type: :request do
     end
 
     it "returns last_logged_days_ago: 0 when tz shifts the most recent entry to today" do
-      travel_to Time.utc(2026, 4, 15, 1, 0, 0) do
+      travel_to Time.utc(2026, 4, 14, 15, 0, 0) do
         practitioner = create_practitioner
         client       = create_client(practitioner: practitioner, accepted: true)
         # Same entry: UTC yesterday, AEST today
