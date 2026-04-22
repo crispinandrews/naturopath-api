@@ -246,4 +246,63 @@ RSpec.describe "Roster summary", type: :request do
       expect(appt.keys).to match_array(%w[id scheduled_at appointment_type duration_minutes])
     end
   end
+
+  describe "flags" do
+    it "includes 'new' for a client who has not accepted their invite" do
+      practitioner = create_practitioner
+      create_client(practitioner: practitioner, accepted: false)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["flags"]).to include("new")
+    end
+
+    it "does not include 'new' for a client who has accepted their invite" do
+      practitioner = create_practitioner
+      create_client(practitioner: practitioner, accepted: true)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["flags"]).not_to include("new")
+    end
+
+    it "includes 'gap' when the client has not logged in 3 or more days and is not pending" do
+      practitioner = create_practitioner
+      client       = create_client(practitioner: practitioner, accepted: true)
+      client.energy_logs.create!(level: 5, recorded_at: 4.days.ago)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["flags"]).to include("gap")
+    end
+
+    it "does not include 'gap' when the client logged 2 days ago" do
+      practitioner = create_practitioner
+      client       = create_client(practitioner: practitioner)
+      client.energy_logs.create!(level: 5, recorded_at: 2.days.ago)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["flags"]).not_to include("gap")
+    end
+
+    it "does not include 'gap' for a pending client even if they have never logged" do
+      practitioner = create_practitioner
+      create_client(practitioner: practitioner, accepted: false)
+
+      get_roster(practitioner: practitioner)
+
+      expect(response_data.first["flags"]).not_to include("gap")
+    end
+
+    it "does not include 'gap' when the client has never logged and is accepted" do
+      practitioner = create_practitioner
+      create_client(practitioner: practitioner, accepted: true)
+
+      get_roster(practitioner: practitioner)
+
+      # last_logged_days_ago is nil — gap only fires when there IS a known last log >= 3 days ago
+      expect(response_data.first["flags"]).not_to include("gap")
+    end
+  end
 end

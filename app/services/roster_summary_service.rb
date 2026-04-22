@@ -12,15 +12,20 @@ class RosterSummaryService
 
     ids = clients.map(&:id)
 
-    sparklines  = fetch_sparklines(ids)
-    adherence   = fetch_adherence(ids)
-    next_appts  = fetch_next_appointments(ids)
+    sparklines = fetch_sparklines(ids)
+    adherence  = fetch_adherence(ids)
+    next_appts = fetch_next_appointments(ids)
 
     clients.map do |client|
       id  = client.id
       adh = adherence[id] || {}
       last_logged_at       = adh[:last_logged_at]
       last_logged_days_ago = last_logged_at ? (@today - last_logged_at.in_time_zone(@tz).to_date).to_i : nil
+      pending              = client.invite_accepted_at.nil?
+
+      flags = []
+      flags << "new" if pending
+      flags << "gap" if !pending && last_logged_days_ago && last_logged_days_ago >= 3
 
       {
         client_id:            id,
@@ -28,7 +33,7 @@ class RosterSummaryService
         adherence_days:       adh[:adherence_days] || 0,
         last_logged_days_ago: last_logged_days_ago,
         next_appointment:     next_appts[id],
-        flags:                []
+        flags:                flags
       }
     end
   end
