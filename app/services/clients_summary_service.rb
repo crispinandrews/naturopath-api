@@ -1,4 +1,4 @@
-class RosterSummaryService
+class ClientsSummaryService
   def initialize(practitioner, tz_name: "UTC")
     @practitioner = practitioner
     @tz    = ActiveSupport::TimeZone[tz_name] || ActiveSupport::TimeZone["UTC"]

@@ -1,14 +1,14 @@
 require "rails_helper"
 
-RSpec.describe "Roster summary", type: :request do
+RSpec.describe "Clients summary", type: :request do
   def get_roster(practitioner:, **params)
-    get "/api/v1/clients/roster_summary",
+    get "/api/v1/clients/summary",
       params: params,
       headers: auth_headers_for(practitioner)
   end
 
   it "requires practitioner authentication" do
-    get "/api/v1/clients/roster_summary"
+    get "/api/v1/clients/summary"
     expect_error_response(status: :unauthorized, code: "unauthorized", message: "Unauthorized")
   end
 

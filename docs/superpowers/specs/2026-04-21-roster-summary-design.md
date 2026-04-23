@@ -1,7 +1,7 @@
 # Roster Summary Endpoint — Design Spec
 
 **Date:** 2026-04-21
-**Route:** `GET /api/v1/clients/roster_summary`
+**Route:** `GET /api/v1/clients/summary`
 
 ---
 
@@ -93,28 +93,28 @@ Add a collection action to the existing `clients` resource:
 
 ```ruby
 resources :clients, only: [:index, :show, :create, :update, :destroy] do
-  get :roster_summary, on: :collection
+  get :summary, on: :collection
   post :resend_invite, on: :member
 end
 ```
 
 ### Controller
 
-New `roster_summary` action in `Api::V1::ClientsController`:
+New `summary` action in `Api::V1::ClientsController`:
 
 ```ruby
-def roster_summary
+def summary
   tz_name = params.fetch(:tz, "UTC")
-  data = RosterSummaryService.new(@current_practitioner, tz_name: tz_name).call
+  data = ClientsSummaryService.new(@current_practitioner, tz_name: tz_name).call
   render json: { data: data }
 end
 ```
 
 No serializer — the service returns plain hashes matching the specified shape exactly.
 
-### Service: `RosterSummaryService`
+### Service: `ClientsSummaryService`
 
-Located at `app/services/roster_summary_service.rb`. Initialised with a `Practitioner` and `tz_name`. `#call` returns an array of hashes, one per client.
+Located at `app/services/clients_summary_service.rb`. Initialised with a `Practitioner` and `tz_name`. `#call` returns an array of hashes, one per client.
 
 Issues **5 bulk SQL queries** (each across all client IDs simultaneously, no per-client queries):
 
@@ -228,7 +228,7 @@ After all 5 queries complete, iterate over clients (ordered by `last_name, first
 
 ## Testing
 
-Spec at `spec/requests/roster_summary_spec.rb`. Cover:
+Spec at `spec/requests/clients_summary_spec.rb`. Cover:
 
 - Returns 200 with correct shape for authenticated practitioner.
 - Returns 401 for unauthenticated requests.
@@ -247,7 +247,7 @@ Spec at `spec/requests/roster_summary_spec.rb`. Cover:
 
 | File | Action |
 |------|--------|
-| `config/routes.rb` | Add `get :roster_summary, on: :collection` |
-| `app/controllers/api/v1/clients_controller.rb` | Add `roster_summary` action |
-| `app/services/roster_summary_service.rb` | New service |
-| `spec/requests/roster_summary_spec.rb` | New request spec |
+| `config/routes.rb` | Add `get :summary, on: :collection` |
+| `app/controllers/api/v1/clients_controller.rb` | Add `summary` action |
+| `app/services/clients_summary_service.rb` | New service |
+| `spec/requests/clients_summary_spec.rb` | New request spec |

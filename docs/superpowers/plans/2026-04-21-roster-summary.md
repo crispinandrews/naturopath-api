@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add `GET /api/v1/clients/roster_summary` — a single-response, no-N+1 endpoint that returns per-client sparklines, adherence, flags, and next appointments for the practitioner dashboard.
+**Goal:** Add `GET /api/v1/clients/summary` — a single-response, no-N+1 endpoint that returns per-client sparklines, adherence, flags, and next appointments for the practitioner dashboard.
 
-**Architecture:** A `RosterSummaryService` issues five bulk SQL queries (each across all client IDs simultaneously), then merges results in Ruby. The controller action is a collection action on the existing `clients` resource. No new migrations required — all data is in existing tables.
+**Architecture:** A `ClientsSummaryService` issues five bulk SQL queries (each across all client IDs simultaneously), then merges results in Ruby. The controller action is a collection action on the existing `clients` resource. No new migrations required — all data is in existing tables.
 
 **Tech Stack:** Rails 7.2, PostgreSQL (uses `DISTINCT ON`, `DATE(... AT TIME ZONE ...)`, `UNION ALL`), RSpec request specs.
 
@@ -14,10 +14,10 @@
 
 | File | Action | Responsibility |
 |------|--------|---------------|
-| `config/routes.rb` | Modify | Add `get :roster_summary, on: :collection` |
-| `app/controllers/api/v1/clients_controller.rb` | Modify | Add `roster_summary` action |
-| `app/services/roster_summary_service.rb` | Create | All five bulk queries + merge logic |
-| `spec/requests/roster_summary_spec.rb` | Create | Full request spec coverage |
+| `config/routes.rb` | Modify | Add `get :summary, on: :collection` |
+| `app/controllers/api/v1/clients_controller.rb` | Modify | Add `summary` action |
+| `app/services/summary_service.rb` | Create | All five bulk queries + merge logic |
+| `spec/requests/summary_spec.rb` | Create | Full request spec coverage |
 
 ---
 
@@ -26,24 +26,24 @@
 **Files:**
 - Modify: `config/routes.rb`
 - Modify: `app/controllers/api/v1/clients_controller.rb`
-- Create: `spec/requests/roster_summary_spec.rb`
+- Create: `spec/requests/summary_spec.rb`
 
 - [ ] **Step 1: Write the failing spec**
 
-Create `spec/requests/roster_summary_spec.rb`:
+Create `spec/requests/summary_spec.rb`:
 
 ```ruby
 require "rails_helper"
 
 RSpec.describe "Roster summary", type: :request do
   def get_roster(practitioner:, **params)
-    get "/api/v1/clients/roster_summary",
+    get "/api/v1/clients/summary",
       params: params,
       headers: auth_headers_for(practitioner)
   end
 
   it "requires practitioner authentication" do
-    get "/api/v1/clients/roster_summary"
+    get "/api/v1/clients/summary"
     expect_error_response(status: :unauthorized, code: "unauthorized", message: "Unauthorized")
   end
 
@@ -86,7 +86,7 @@ end
 - [ ] **Step 2: Run spec to confirm it fails**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb --format documentation
+bundle exec rspec spec/requests/summary_spec.rb --format documentation
 ```
 
 Expected: all 4 examples fail (routing error — route doesn't exist yet).
@@ -105,7 +105,7 @@ to:
 
 ```ruby
 resources :clients, only: [ :index, :show, :create, :update, :destroy ] do
-  get  :roster_summary, on: :collection
+  get  :summary, on: :collection
   post :resend_invite, on: :member
 end
 ```
@@ -115,7 +115,7 @@ end
 In `app/controllers/api/v1/clients_controller.rb`, add after the `destroy` action (before `resend_invite`):
 
 ```ruby
-def roster_summary
+def summary
   render json: { data: [] }
 end
 ```
@@ -123,7 +123,7 @@ end
 - [ ] **Step 5: Run spec to see which tests now pass**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb --format documentation
+bundle exec rspec spec/requests/summary_spec.rb --format documentation
 ```
 
 Expected: auth test passes, empty-array test passes, shape test fails (returns `[]` instead of one record).
@@ -131,8 +131,8 @@ Expected: auth test passes, empty-array test passes, shape test fails (returns `
 - [ ] **Step 6: Commit**
 
 ```bash
-git add config/routes.rb app/controllers/api/v1/clients_controller.rb spec/requests/roster_summary_spec.rb
-git commit -m "Add GET /clients/roster_summary route and stub action"
+git add config/routes.rb app/controllers/api/v1/clients_controller.rb spec/requests/summary_spec.rb
+git commit -m "Add GET /clients/summary route and stub action"
 ```
 
 ---
@@ -140,13 +140,13 @@ git commit -m "Add GET /clients/roster_summary route and stub action"
 ## Task 2: Service skeleton + energy sparkline
 
 **Files:**
-- Create: `app/services/roster_summary_service.rb`
+- Create: `app/services/summary_service.rb`
 - Modify: `app/controllers/api/v1/clients_controller.rb` (wire service)
-- Modify: `spec/requests/roster_summary_spec.rb` (add sparkline tests)
+- Modify: `spec/requests/summary_spec.rb` (add sparkline tests)
 
 - [ ] **Step 1: Add sparkline tests to the spec**
 
-Add these examples to `spec/requests/roster_summary_spec.rb` (after the existing examples, still inside the `describe` block):
+Add these examples to `spec/requests/summary_spec.rb` (after the existing examples, still inside the `describe` block):
 
 ```ruby
   describe "energy_sparkline" do
@@ -206,17 +206,17 @@ Add these examples to `spec/requests/roster_summary_spec.rb` (after the existing
 - [ ] **Step 2: Run new tests to confirm they fail**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb -e "energy_sparkline" --format documentation
+bundle exec rspec spec/requests/summary_spec.rb -e "energy_sparkline" --format documentation
 ```
 
 Expected: all sparkline examples fail (service not wired yet; stub returns `[]`).
 
 - [ ] **Step 3: Create the service**
 
-Create `app/services/roster_summary_service.rb`:
+Create `app/services/summary_service.rb`:
 
 ```ruby
-class RosterSummaryService
+class ClientsSummaryService
   def initialize(practitioner, tz_name: "UTC")
     @practitioner = practitioner
     @tz    = ActiveSupport::TimeZone[tz_name] || ActiveSupport::TimeZone["UTC"]
@@ -280,12 +280,12 @@ end
 
 - [ ] **Step 4: Wire service into controller**
 
-Replace the stub `roster_summary` action in `app/controllers/api/v1/clients_controller.rb`:
+Replace the stub `summary` action in `app/controllers/api/v1/clients_controller.rb`:
 
 ```ruby
-def roster_summary
+def summary
   tz_name = params.fetch(:tz, "UTC")
-  data = RosterSummaryService.new(@current_practitioner, tz_name: tz_name).call
+  data = ClientsSummaryService.new(@current_practitioner, tz_name: tz_name).call
   render json: { data: data }
 end
 ```
@@ -293,7 +293,7 @@ end
 - [ ] **Step 5: Run the full spec to confirm sparkline tests pass**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb --format documentation
+bundle exec rspec spec/requests/summary_spec.rb --format documentation
 ```
 
 Expected: auth, empty array, isolation, shape, and all sparkline tests pass. The stub-only other fields (`adherence_days: 0`, `flags: []`, etc.) satisfy the shape test.
@@ -301,8 +301,8 @@ Expected: auth, empty array, isolation, shape, and all sparkline tests pass. The
 - [ ] **Step 6: Commit**
 
 ```bash
-git add app/services/roster_summary_service.rb app/controllers/api/v1/clients_controller.rb spec/requests/roster_summary_spec.rb
-git commit -m "Add RosterSummaryService with energy sparkline query"
+git add app/services/summary_service.rb app/controllers/api/v1/clients_controller.rb spec/requests/summary_spec.rb
+git commit -m "Add ClientsSummaryService with energy sparkline query"
 ```
 
 ---
@@ -310,12 +310,12 @@ git commit -m "Add RosterSummaryService with energy sparkline query"
 ## Task 3: Adherence days + last_logged_days_ago
 
 **Files:**
-- Modify: `app/services/roster_summary_service.rb`
-- Modify: `spec/requests/roster_summary_spec.rb`
+- Modify: `app/services/summary_service.rb`
+- Modify: `spec/requests/summary_spec.rb`
 
 - [ ] **Step 1: Add adherence and last_logged tests**
 
-Add to `spec/requests/roster_summary_spec.rb`:
+Add to `spec/requests/summary_spec.rb`:
 
 ```ruby
   describe "adherence_days" do
@@ -397,14 +397,14 @@ Add to `spec/requests/roster_summary_spec.rb`:
 - [ ] **Step 2: Run new tests to confirm they fail**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb -e "adherence_days" -e "last_logged_days_ago" --format documentation
+bundle exec rspec spec/requests/summary_spec.rb -e "adherence_days" -e "last_logged_days_ago" --format documentation
 ```
 
 Expected: all adherence and last_logged examples fail.
 
 - [ ] **Step 3: Add `fetch_adherence` to the service and wire it into `call`**
 
-Add the following private method to `RosterSummaryService` (after `fetch_sparklines`):
+Add the following private method to `ClientsSummaryService` (after `fetch_sparklines`):
 
 ```ruby
   def fetch_adherence(ids)
@@ -477,7 +477,7 @@ Update the `call` method to use `fetch_adherence` and compute `last_logged_days_
 - [ ] **Step 4: Run spec**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb --format documentation
+bundle exec rspec spec/requests/summary_spec.rb --format documentation
 ```
 
 Expected: all previously passing tests still pass; all new adherence and last_logged tests now pass.
@@ -485,7 +485,7 @@ Expected: all previously passing tests still pass; all new adherence and last_lo
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/services/roster_summary_service.rb spec/requests/roster_summary_spec.rb
+git add app/services/summary_service.rb spec/requests/summary_spec.rb
 git commit -m "Add adherence_days and last_logged_days_ago to roster summary"
 ```
 
@@ -494,12 +494,12 @@ git commit -m "Add adherence_days and last_logged_days_ago to roster summary"
 ## Task 4: Next appointment
 
 **Files:**
-- Modify: `app/services/roster_summary_service.rb`
-- Modify: `spec/requests/roster_summary_spec.rb`
+- Modify: `app/services/summary_service.rb`
+- Modify: `spec/requests/summary_spec.rb`
 
 - [ ] **Step 1: Add next_appointment tests**
 
-Add to `spec/requests/roster_summary_spec.rb`:
+Add to `spec/requests/summary_spec.rb`:
 
 ```ruby
   describe "next_appointment" do
@@ -578,7 +578,7 @@ Add to `spec/requests/roster_summary_spec.rb`:
 - [ ] **Step 2: Run new tests to confirm they fail**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb -e "next_appointment" --format documentation
+bundle exec rspec spec/requests/summary_spec.rb -e "next_appointment" --format documentation
 ```
 
 Expected: "is null" tests pass (stub returns nil), but "earliest" and "four fields" tests fail.
@@ -642,7 +642,7 @@ Update `call` to use `fetch_next_appointments` and change `next_appointment: nil
 - [ ] **Step 4: Run spec**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb --format documentation
+bundle exec rspec spec/requests/summary_spec.rb --format documentation
 ```
 
 Expected: all tests pass.
@@ -650,7 +650,7 @@ Expected: all tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/services/roster_summary_service.rb spec/requests/roster_summary_spec.rb
+git add app/services/summary_service.rb spec/requests/summary_spec.rb
 git commit -m "Add next_appointment to roster summary using DISTINCT ON"
 ```
 
@@ -661,12 +661,12 @@ git commit -m "Add next_appointment to roster summary using DISTINCT ON"
 These flags require no new SQL query — they derive from data already fetched.
 
 **Files:**
-- Modify: `app/services/roster_summary_service.rb`
-- Modify: `spec/requests/roster_summary_spec.rb`
+- Modify: `app/services/summary_service.rb`
+- Modify: `spec/requests/summary_spec.rb`
 
 - [ ] **Step 1: Add flag tests**
 
-Add to `spec/requests/roster_summary_spec.rb`:
+Add to `spec/requests/summary_spec.rb`:
 
 ```ruby
   describe "flags" do
@@ -732,7 +732,7 @@ Add to `spec/requests/roster_summary_spec.rb`:
 - [ ] **Step 2: Run new tests to confirm they fail**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb -e "flags" --format documentation
+bundle exec rspec spec/requests/summary_spec.rb -e "flags" --format documentation
 ```
 
 Expected: `"new"` and `"gap"` tests fail (flags is always `[]`).
@@ -797,7 +797,7 @@ The full updated `call` method is now:
 - [ ] **Step 4: Run spec**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb --format documentation
+bundle exec rspec spec/requests/summary_spec.rb --format documentation
 ```
 
 Expected: all tests pass.
@@ -805,7 +805,7 @@ Expected: all tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/services/roster_summary_service.rb spec/requests/roster_summary_spec.rb
+git add app/services/summary_service.rb spec/requests/summary_spec.rb
 git commit -m "Add 'new' and 'gap' flags to roster summary"
 ```
 
@@ -814,12 +814,12 @@ git commit -m "Add 'new' and 'gap' flags to roster summary"
 ## Task 6: Flag — `"symptom-up"`
 
 **Files:**
-- Modify: `app/services/roster_summary_service.rb`
-- Modify: `spec/requests/roster_summary_spec.rb`
+- Modify: `app/services/summary_service.rb`
+- Modify: `spec/requests/summary_spec.rb`
 
 - [ ] **Step 1: Add symptom-up tests**
 
-Add to the `"flags"` describe block in `spec/requests/roster_summary_spec.rb`:
+Add to the `"flags"` describe block in `spec/requests/summary_spec.rb`:
 
 ```ruby
     it "includes 'symptom-up' when last 7-day average > 1.5x prior 7-day average" do
@@ -863,7 +863,7 @@ Add to the `"flags"` describe block in `spec/requests/roster_summary_spec.rb`:
 - [ ] **Step 2: Run new tests to confirm they fail**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb -e "symptom-up" --format documentation
+bundle exec rspec spec/requests/summary_spec.rb -e "symptom-up" --format documentation
 ```
 
 Expected: all three symptom-up tests fail.
@@ -954,7 +954,7 @@ Update `call` to call `fetch_symptom_windows` and add the flag:
 - [ ] **Step 4: Run spec**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb --format documentation
+bundle exec rspec spec/requests/summary_spec.rb --format documentation
 ```
 
 Expected: all tests pass.
@@ -962,7 +962,7 @@ Expected: all tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/services/roster_summary_service.rb spec/requests/roster_summary_spec.rb
+git add app/services/summary_service.rb spec/requests/summary_spec.rb
 git commit -m "Add symptom-up flag to roster summary"
 ```
 
@@ -971,8 +971,8 @@ git commit -m "Add symptom-up flag to roster summary"
 ## Task 7: Flag — `"sleep-down"`
 
 **Files:**
-- Modify: `app/services/roster_summary_service.rb`
-- Modify: `spec/requests/roster_summary_spec.rb`
+- Modify: `app/services/summary_service.rb`
+- Modify: `spec/requests/summary_spec.rb`
 
 - [ ] **Step 1: Add sleep-down tests**
 
@@ -1037,7 +1037,7 @@ Add to the `"flags"` describe block:
 - [ ] **Step 2: Run new tests to confirm they fail**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb -e "sleep-down" --format documentation
+bundle exec rspec spec/requests/summary_spec.rb -e "sleep-down" --format documentation
 ```
 
 Expected: all three sleep-down tests fail.
@@ -1122,7 +1122,7 @@ Update `call` to call `fetch_sleep_windows` and add the flag:
 - [ ] **Step 4: Run spec**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb --format documentation
+bundle exec rspec spec/requests/summary_spec.rb --format documentation
 ```
 
 Expected: all tests pass.
@@ -1130,7 +1130,7 @@ Expected: all tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/services/roster_summary_service.rb spec/requests/roster_summary_spec.rb
+git add app/services/summary_service.rb spec/requests/summary_spec.rb
 git commit -m "Add sleep-down flag to roster summary"
 ```
 
@@ -1139,13 +1139,13 @@ git commit -m "Add sleep-down flag to roster summary"
 ## Task 8: Timezone param
 
 **Files:**
-- Modify: `spec/requests/roster_summary_spec.rb`
+- Modify: `spec/requests/summary_spec.rb`
 
 No service changes needed — the `tz` param is already plumbed through from Task 2.
 
 - [ ] **Step 1: Add timezone tests**
 
-Add to `spec/requests/roster_summary_spec.rb`:
+Add to `spec/requests/summary_spec.rb`:
 
 ```ruby
   describe "tz param" do
@@ -1186,7 +1186,7 @@ Add to `spec/requests/roster_summary_spec.rb`:
 - [ ] **Step 2: Run new tests to confirm they fail or expose issues**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb -e "tz param" --format documentation
+bundle exec rspec spec/requests/summary_spec.rb -e "tz param" --format documentation
 ```
 
 Expected: "shifts day boundaries" test fails if day alignment is off; "falls back to UTC" should pass.
@@ -1194,7 +1194,7 @@ Expected: "shifts day boundaries" test fails if day alignment is off; "falls bac
 - [ ] **Step 3: Run the full suite**
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb --format documentation
+bundle exec rspec spec/requests/summary_spec.rb --format documentation
 ```
 
 Expected: all tests pass.
@@ -1202,7 +1202,7 @@ Expected: all tests pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add spec/requests/roster_summary_spec.rb
+git add spec/requests/summary_spec.rb
 git commit -m "Add timezone param tests for roster summary"
 ```
 
@@ -1228,5 +1228,5 @@ After all tasks are complete, run against the spec:
 Run full suite before marking complete:
 
 ```bash
-bundle exec rspec spec/requests/roster_summary_spec.rb --format documentation
+bundle exec rspec spec/requests/summary_spec.rb --format documentation
 ```

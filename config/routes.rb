@@ -16,7 +16,7 @@ Rails.application.routes.draw do
 
       # Practitioner-facing: manage clients
       resources :clients, only: [ :index, :show, :create, :update, :destroy ] do
-        get  :roster_summary, on: :collection
+        get  :summary, on: :collection
         post :resend_invite, on: :member
       end
 

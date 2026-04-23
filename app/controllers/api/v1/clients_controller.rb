@@ -44,9 +44,9 @@ module Api
         head :no_content
       end
 
-      def roster_summary
+      def summary
         tz_name = params.fetch(:tz, "UTC")
-        data = RosterSummaryService.new(@current_practitioner, tz_name: tz_name).call
+        data = ClientsSummaryService.new(@current_practitioner, tz_name: tz_name).call
         render json: { data: data }
       end
 
