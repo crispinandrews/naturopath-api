@@ -9,14 +9,13 @@ class DailyAggregateService
   }.freeze
 
   def initialize(client, from:, to:, tz_name: "UTC", metrics: METRIC_CONFIG.keys)
-    @client  = client
-    @tz      = ActiveSupport::TimeZone[tz_name] || ActiveSupport::TimeZone["UTC"]
+    @client    = client
+    @tz        = ActiveSupport::TimeZone[tz_name] || ActiveSupport::TimeZone["UTC"]
     @from_date = coerce_date(from)
     @to_date   = coerce_date(to)
     @from      = @tz.local(@from_date.year, @from_date.month, @from_date.day).beginning_of_day
     @to        = @tz.local(@to_date.year, @to_date.month, @to_date.day).end_of_day
-    @metrics = Array(metrics).map(&:to_sym) & METRIC_CONFIG.keys
-    @tz_name = @tz.tzinfo.name
+    @metrics   = Array(metrics).map(&:to_sym) & METRIC_CONFIG.keys
   end
 
   def call
@@ -36,27 +35,61 @@ class DailyAggregateService
   end
 
   def merge_metric(result, metric)
-    cfg   = METRIC_CONFIG[metric]
-    scope = @client.public_send(cfg[:model])
-                   .where("#{cfg[:ts]} >= ? AND #{cfg[:ts]} <= ?", @from, @to)
-    day_expr = "DATE((#{cfg[:ts]} AT TIME ZONE 'UTC') AT TIME ZONE '#{@tz_name}')"
-
-    rows = case cfg[:agg]
-    when :avg_hours then scope.group(day_expr).average(:hours_slept)
-    when :avg_level then scope.group(day_expr).average(:level)
-    when :sum_ml    then scope.group(day_expr).sum(:amount_ml)
-    when :count     then scope.group(day_expr).count
-    end
-
-    rows.each do |day, value|
+    aggregate_rows_for(metric).each do |day, value|
       next unless result.key?(day)
-      result[day][metric_key(metric)] = value.is_a?(BigDecimal) ? value.to_f.round(2) : value
+
+      result[day][metric_key(metric)] = value
     end
   end
 
   def metric_key(metric)
     { sleep: :sleep_hours, energy: :energy_level, symptoms: :symptom_count,
       water: :water_ml, food: :food_entries, supplements: :supplement_doses }[metric]
+  end
+
+  def aggregate_rows_for(metric)
+    case metric
+    when :sleep
+      average_by_day(@client.sleep_logs.where(bedtime: @from..@to).pluck(:bedtime, :hours_slept))
+    when :energy
+      average_by_day(@client.energy_logs.where(recorded_at: @from..@to).pluck(:recorded_at, :level))
+    when :symptoms
+      count_by_day(@client.symptoms.where(occurred_at: @from..@to).pluck(:occurred_at))
+    when :water
+      sum_by_day(@client.water_intakes.where(recorded_at: @from..@to).pluck(:recorded_at, :amount_ml))
+    when :food
+      count_by_day(@client.food_entries.where(consumed_at: @from..@to).pluck(:consumed_at))
+    when :supplements
+      count_by_day(@client.supplements.where(taken_at: @from..@to).pluck(:taken_at))
+    else
+      {}
+    end
+  end
+
+  def average_by_day(rows)
+    grouped = Hash.new { |h, day| h[day] = [] }
+
+    rows.each do |timestamp, value|
+      grouped[local_day(timestamp)] << value.to_f
+    end
+
+    grouped.transform_values { |values| (values.sum / values.size).round(2) }
+  end
+
+  def count_by_day(timestamps)
+    timestamps.each_with_object(Hash.new(0)) do |timestamp, counts|
+      counts[local_day(timestamp)] += 1
+    end
+  end
+
+  def sum_by_day(rows)
+    rows.each_with_object(Hash.new(0)) do |(timestamp, value), sums|
+      sums[local_day(timestamp)] += value
+    end
+  end
+
+  def local_day(timestamp)
+    timestamp.in_time_zone(@tz).to_date
   end
 
   def coerce_date(value)

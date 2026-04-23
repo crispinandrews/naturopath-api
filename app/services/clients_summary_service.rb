@@ -1,8 +1,16 @@
 class ClientsSummaryService
+  TRACKED_SOURCES = [
+    [ EnergyLog, :recorded_at ],
+    [ SleepLog, :bedtime ],
+    [ Symptom, :occurred_at ],
+    [ WaterIntake, :recorded_at ],
+    [ FoodEntry, :consumed_at ],
+    [ Supplement, :taken_at ]
+  ].freeze
+
   def initialize(practitioner, tz_name: "UTC")
     @practitioner = practitioner
     @tz    = ActiveSupport::TimeZone[tz_name] || ActiveSupport::TimeZone["UTC"]
-    @tz_pg = @tz.tzinfo.name
     @today = Time.current.in_time_zone(@tz).to_date
   end
 
@@ -52,25 +60,24 @@ class ClientsSummaryService
     @two_weeks_start ||= @tz.local(@today.year, @today.month, @today.day) - 13.days
   end
 
-  def tz_day(col)
-    "DATE((#{col} AT TIME ZONE 'UTC') AT TIME ZONE '#{@tz_pg}')"
-  end
-
   def fetch_sparklines(ids)
-    days = (0..29).map { |i| @today - (29 - i) }  # index 0 = today-29, index 29 = today
+    days = (0..29).map { |i| @today - (29 - i) }
+    totals_by_client = Hash.new { |h, client_id| h[client_id] = Hash.new { |client_days, day| client_days[day] = [ 0.0, 0 ] } }
 
-    day_expr = tz_day("recorded_at")
-    rows = EnergyLog
-      .where(client_id: ids)
-      .where("recorded_at >= ?", window_start)
-      .group("client_id", day_expr)
-      .average(:level)
-    # rows: { [client_id, "YYYY-MM-DD"] => BigDecimal, ... }
+    EnergyLog.where(client_id: ids, recorded_at: window_start..)
+      .pluck(:client_id, :recorded_at, :level)
+      .each do |client_id, recorded_at, level|
+        day = recorded_at.in_time_zone(@tz).to_date
+        totals = totals_by_client[client_id][day]
+        totals[0] += level
+        totals[1] += 1
+      end
 
-    by_client = Hash.new { |h, k| h[k] = {} }
-    rows.each do |(cid, day), avg|
-      day_obj = day.is_a?(Date) ? day : Date.parse(day.to_s)
-      by_client[cid][day_obj] = avg.to_f.round(2)
+    by_client = Hash.new { |h, client_id| h[client_id] = {} }
+    totals_by_client.each do |client_id, day_totals|
+      day_totals.each do |day, (sum, count)|
+        by_client[client_id][day] = (sum / count).round(2)
+      end
     end
 
     ids.each_with_object({}) do |id, h|
@@ -80,90 +87,68 @@ class ClientsSummaryService
   end
 
   def fetch_adherence(ids)
-    id_in        = ids.map(&:to_i).join(", ")
-    quoted_start = ActiveRecord::Base.connection.quote(window_start)
-    sql = <<~SQL
-      SELECT client_id,
-             COUNT(DISTINCT CASE
-               WHEN ts >= #{quoted_start}
-               THEN #{tz_day('ts')}
-             END)::integer AS adherence_days,
-             MAX(ts) AS last_logged_at
-      FROM (
-        SELECT client_id, recorded_at AS ts FROM energy_logs   WHERE client_id IN (#{id_in})
-        UNION ALL
-        SELECT client_id, bedtime     AS ts FROM sleep_logs    WHERE client_id IN (#{id_in})
-        UNION ALL
-        SELECT client_id, occurred_at AS ts FROM symptoms      WHERE client_id IN (#{id_in})
-        UNION ALL
-        SELECT client_id, recorded_at AS ts FROM water_intakes WHERE client_id IN (#{id_in})
-        UNION ALL
-        SELECT client_id, consumed_at AS ts FROM food_entries  WHERE client_id IN (#{id_in})
-        UNION ALL
-        SELECT client_id, taken_at    AS ts FROM supplements   WHERE client_id IN (#{id_in})
-      ) all_entries
-      GROUP BY client_id
-    SQL
+    adherence_days = Hash.new { |h, client_id| h[client_id] = {} }
+    last_logged_at = {}
 
-    ActiveRecord::Base.connection.exec_query(sql).each_with_object({}) do |r, h|
-      ts = r["last_logged_at"]
-      last_logged_at = ts ? (ts.respond_to?(:utc) ? ts : Time.parse(ts.to_s)) : nil
-      h[r["client_id"]] = {
-        adherence_days: r["adherence_days"].to_i,
-        last_logged_at: last_logged_at
+    TRACKED_SOURCES.each do |model, column|
+      model.where(client_id: ids).group(:client_id).maximum(column).each do |client_id, timestamp|
+        next unless timestamp
+        next if last_logged_at[client_id] && last_logged_at[client_id] >= timestamp
+
+        last_logged_at[client_id] = timestamp
+      end
+
+      model.where(client_id: ids, column => window_start..).pluck(:client_id, column).each do |client_id, timestamp|
+        adherence_days[client_id][timestamp.in_time_zone(@tz).to_date] = true
+      end
+    end
+
+    ids.each_with_object({}) do |client_id, memo|
+      memo[client_id] = {
+        adherence_days: adherence_days[client_id].size,
+        last_logged_at: last_logged_at[client_id]
       }
     end
   end
 
   def fetch_next_appointments(ids)
-    id_in = ids.map(&:to_i).join(", ")
-    sql = <<~SQL
-      SELECT DISTINCT ON (client_id)
-        client_id, id, scheduled_at, appointment_type, duration_minutes
-      FROM appointments
-      WHERE client_id IN (#{id_in})
-        AND status = 'scheduled'
-        AND scheduled_at > NOW()
-      ORDER BY client_id, scheduled_at ASC
-    SQL
+    Appointment.where(client_id: ids, status: "scheduled")
+      .where("scheduled_at > ?", Time.current)
+      .order(:client_id, :scheduled_at)
+      .each_with_object({}) do |appointment, memo|
+        next if memo.key?(appointment.client_id)
 
-    ActiveRecord::Base.connection.exec_query(sql).each_with_object({}) do |r, h|
-      ts = r["scheduled_at"]
-      scheduled_at = ts.respond_to?(:utc) ? ts.utc : Time.parse(ts.to_s).utc
-      h[r["client_id"]] = {
-        "id"               => r["id"].to_i,
-        "scheduled_at"     => scheduled_at.iso8601,
-        "appointment_type" => r["appointment_type"],
-        "duration_minutes" => r["duration_minutes"].to_i
-      }
-    end
+        memo[appointment.client_id] = {
+          "id"               => appointment.id,
+          "scheduled_at"     => appointment.scheduled_at.utc.iso8601,
+          "appointment_type" => appointment.appointment_type,
+          "duration_minutes" => appointment.duration_minutes
+        }
+      end
   end
 
   def fetch_symptom_windows(ids)
-    id_in              = ids.map(&:to_i).join(", ")
-    two_weeks_start_ts = ActiveRecord::Base.connection.quote(two_weeks_start)
-    week1_start_quoted = ActiveRecord::Base.connection.quote((@today - 6).to_s)
+    counts_by_client = Hash.new { |h, client_id| h[client_id] = Hash.new(0) }
 
-    sql = <<~SQL
-      SELECT client_id,
-             AVG(CASE WHEN day >= #{week1_start_quoted} THEN daily_count END) AS last7_avg,
-             AVG(CASE WHEN day <  #{week1_start_quoted} THEN daily_count END) AS prior7_avg
-      FROM (
-        SELECT client_id,
-               #{tz_day('occurred_at')} AS day,
-               COUNT(*) AS daily_count
-        FROM symptoms
-        WHERE client_id IN (#{id_in})
-          AND occurred_at >= #{two_weeks_start_ts}
-        GROUP BY client_id, #{tz_day('occurred_at')}
-      ) daily
-      GROUP BY client_id
-    SQL
+    Symptom.where(client_id: ids, occurred_at: two_weeks_start..).pluck(:client_id, :occurred_at).each do |client_id, occurred_at|
+      counts_by_client[client_id][occurred_at.in_time_zone(@tz).to_date] += 1
+    end
 
-    ActiveRecord::Base.connection.exec_query(sql).each_with_object({}) do |r, h|
-      h[r["client_id"]] = {
-        last7_avg:  r["last7_avg"]&.to_f,
-        prior7_avg: r["prior7_avg"]&.to_f
+    build_window_averages(counts_by_client)
+  end
+
+  def build_window_averages(values_by_client)
+    ids = values_by_client.keys
+    week1_start = @today - 6
+
+    ids.each_with_object({}) do |client_id, memo|
+      values = values_by_client[client_id]
+      last7_values = values.filter_map { |day, value| value if day >= week1_start }
+      prior7_values = values.filter_map { |day, value| value if day < week1_start }
+
+      memo[client_id] = {
+        last7_avg: average(last7_values),
+        prior7_avg: average(prior7_values)
       }
     end
   end
@@ -176,32 +161,17 @@ class ClientsSummaryService
   end
 
   def fetch_sleep_windows(ids)
-    id_in              = ids.map(&:to_i).join(", ")
-    two_weeks_start_ts = ActiveRecord::Base.connection.quote(two_weeks_start)
-    week1_start_quoted = ActiveRecord::Base.connection.quote((@today - 6).to_s)
+    hours_by_client = Hash.new { |h, client_id| h[client_id] = Hash.new { |client_days, day| client_days[day] = [] } }
 
-    sql = <<~SQL
-      SELECT client_id,
-             AVG(CASE WHEN day >= #{week1_start_quoted} THEN avg_hours END) AS last7_avg,
-             AVG(CASE WHEN day <  #{week1_start_quoted} THEN avg_hours END) AS prior7_avg
-      FROM (
-        SELECT client_id,
-               #{tz_day('bedtime')} AS day,
-               AVG(hours_slept) AS avg_hours
-        FROM sleep_logs
-        WHERE client_id IN (#{id_in})
-          AND bedtime >= #{two_weeks_start_ts}
-        GROUP BY client_id, #{tz_day('bedtime')}
-      ) daily
-      GROUP BY client_id
-    SQL
-
-    ActiveRecord::Base.connection.exec_query(sql).each_with_object({}) do |r, h|
-      h[r["client_id"]] = {
-        last7_avg:  r["last7_avg"]&.to_f,
-        prior7_avg: r["prior7_avg"]&.to_f
-      }
+    SleepLog.where(client_id: ids, bedtime: two_weeks_start..).pluck(:client_id, :bedtime, :hours_slept).each do |client_id, bedtime, hours_slept|
+      hours_by_client[client_id][bedtime.in_time_zone(@tz).to_date] << hours_slept.to_f
     end
+
+    daily_averages = hours_by_client.transform_values do |day_values|
+      day_values.transform_values { |hours| average(hours) }
+    end
+
+    build_window_averages(daily_averages)
   end
 
   def sleep_down?(window)
@@ -209,5 +179,11 @@ class ClientsSummaryService
     last7  = window[:last7_avg]
     prior7 = window[:prior7_avg]
     !last7.nil? && !prior7.nil? && last7 < prior7 - 0.5
+  end
+
+  def average(values)
+    return nil if values.empty?
+
+    values.sum.to_f / values.size
   end
 end

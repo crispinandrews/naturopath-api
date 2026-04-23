@@ -28,7 +28,7 @@ RSpec.describe "Clients summary", type: :request do
     get_roster(practitioner: practitioner)
 
     expect(response).to have_http_status(:ok)
-    expect(response_data.map { |r| r["client_id"] }).to eq([own_client.id])
+    expect(response_data.map { |r| r["client_id"] }).to eq([ own_client.id ])
   end
 
   it "returns the correct per-client response shape" do

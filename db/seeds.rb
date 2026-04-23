@@ -18,7 +18,7 @@ clients_data = [
   { email: "client2@example.com", first_name: "Ana",    last_name: "Ferreira", dob: Date.new(1985, 8, 22), focus_tag: "energy_fatigue" },
   { email: "client3@example.com", first_name: "Marco",  last_name: "Oliveira", dob: Date.new(1992, 3,  8),  focus_tag: "weight_management" },
   { email: "client4@example.com", first_name: "Lucia",  last_name: "Chen",     dob: Date.new(1988, 11, 30), focus_tag: "hormonal_balance" },
-  { email: "client5@example.com", first_name: "Thomas", last_name: "Berg",     dob: Date.new(1978, 6, 17),  focus_tag: "stress_sleep" },
+  { email: "client5@example.com", first_name: "Thomas", last_name: "Berg",     dob: Date.new(1978, 6, 17),  focus_tag: "stress_sleep" }
 ]
 
 clients = clients_data.map do |data|
@@ -147,7 +147,7 @@ notes_seed = [
 
   { client: client5, note_type: "intake",      pinned: true,  body: "Presenting with high occupational stress, sleep onset difficulties, waking at 3am. Discussed sleep hygiene, blue light exposure, and evening routine." },
   { client: client5, note_type: "session",     pinned: false, body: "Two-week review. Sleep onset improved. Still waking early. Added L-theanine and phosphatidylserine to evening protocol." },
-  { client: client5, note_type: "message",     pinned: false, body: "Client reports significant improvement in sleep depth. Wants to discuss stress management strategies further at next appointment." },
+  { client: client5, note_type: "message",     pinned: false, body: "Client reports significant improvement in sleep depth. Wants to discuss stress management strategies further at next appointment." }
 ]
 
 notes_seed.each do |attrs|
@@ -193,13 +193,13 @@ appointments_seed = [
   # client5
   { client: client5, scheduled_at: 3.weeks.ago,  duration: 90, type: "intake",    status: "completed",  notes: "Stress and sleep intake." },
   { client: client5, scheduled_at: 1.week.ago,   duration: 45, type: "check_in",  status: "completed",  notes: "Two-week sleep review." },
-  { client: client5, scheduled_at: 5.days.from_now, duration: 60, type: "follow_up", status: "scheduled", notes: nil },
+  { client: client5, scheduled_at: 5.days.from_now, duration: 60, type: "follow_up", status: "scheduled", notes: nil }
 ]
 
 appointments_seed.each do |attrs|
   Appointment.find_or_create_by!(
     client:       attrs[:client],
-    scheduled_at: attrs[:scheduled_at],
+    scheduled_at: attrs[:scheduled_at]
   ) do |a|
     a.practitioner    = practitioner
     a.duration_minutes = attrs[:duration]
